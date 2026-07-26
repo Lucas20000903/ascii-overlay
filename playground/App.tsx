@@ -177,6 +177,19 @@ export function App() {
 
   useEffect(() => { void loadImage('/sample.png').then(setLoaded); }, []);
 
+  // Paste an image straight from the clipboard.
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      const file = [...(e.clipboardData?.items ?? [])]
+        .find(i => i.type.startsWith('image/'))?.getAsFile();
+      if (!file) return;
+      e.preventDefault();
+      void loadImage(URL.createObjectURL(file)).then(setLoaded);
+    };
+    document.addEventListener('paste', onPaste);
+    return () => document.removeEventListener('paste', onPaste);
+  }, []);
+
   const time = useAnimationTime({ playing: playing && shimmer > 0, speed });
 
   const source = loaded?.data ?? null;
@@ -301,7 +314,7 @@ export function App() {
             if (file) setLoaded(await loadImage(URL.createObjectURL(file)));
           }}
         >
-          Drop an image here, or
+          Drop an image here, or paste with cmd+V
           <div style={{ marginTop: 6 }}>
             <button onClick={() => void pick(setLoaded)}>Choose a file</button>
           </div>
