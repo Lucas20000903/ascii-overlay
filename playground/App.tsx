@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import {
-  RAMPS, ellipseMask, gridToSvg, gridToText, imageMask, measureCell, rectMask,
+  RAMPS, asciiLayer, ellipseMask, fillLayer, gridToText, imageLayer, imageMask,
+  layersToSvg, measureCell, paintLayers, rectMask,
 } from '../dist/index.js';
-import {
-  AsciiCanvas, AsciiSvg, useAnimationTime, useAsciiGrid,
-} from '../dist/react/index.js';
+import { useAnimationTime, useAsciiGrid, useVideoSource } from '../dist/react/index.js';
+import type { ImageLayerOptions, Layer } from '../dist/index.js';
 import type {
   AsciiMode, BlendMode, GlyphBlend, Mask, Source, TintPreset,
 } from '../dist/index.js';
@@ -122,8 +122,54 @@ const CELL_BASES: readonly CellBasis[] = ['M', 'ramp mean'];
 type Output = 'canvas' | 'svg';
 const OUTPUTS: readonly Output[] = ['canvas', 'svg'];
 
+const DEFS =
+  '<filter id="glow" x="-20%" y="-20%" width="140%" height="140%">'
+  + '<feGaussianBlur stdDeviation="2" result="b"/>'
+  + '<feMerge><feMergeNode in="b"/><feMergeNode in="b"/>'
+  + '<feMergeNode in="SourceGraphic"/></feMerge></filter>';
+
+/**
+ * Paints a layer stack with whichever backend is selected.
+ *
+ * The playground drives the core compositor directly rather than a React
+ * wrapper, so the public API gets exercised the way a consumer would use it.
+ */
+function LayerStack(props: {
+  layers: Layer[]; width: number; height: number;
+  backend: Output; style?: CSSProperties;
+}) {
+  const { layers, width, height, backend, style } = props;
+  const ref = useRef<HTMLCanvasElement>(null);
+  const ratio = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1;
+
+  useEffect(() => {
+    if (backend !== 'canvas') return;
+    const ctx = ref.current?.getContext('2d');
+    if (ctx) paintLayers(ctx, layers, { pixelRatio: ratio });
+  }, [layers, backend, ratio, width, height]);
+
+  if (backend === 'svg') {
+    return (
+      <div
+        style={style}
+        dangerouslySetInnerHTML={{ __html: layersToSvg(layers, { width, height, defs: DEFS }) }}
+      />
+    );
+  }
+  return (
+    <canvas
+      ref={ref}
+      width={Math.round(width * ratio)}
+      height={Math.round(height * ratio)}
+      style={{ width, height, ...style }}
+    />
+  );
+}
+
 export function App() {
   const [loaded, setLoaded] = useState<Loaded | null>(null);
+  const [live, setLive] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const [maskImage, setMaskImage] = useState<Source | null>(null);
   const [over, setOver] = useState(false);
   const stage = useRef<HTMLDivElement>(null);
@@ -135,6 +181,7 @@ export function App() {
   const [customRamp, setCustomRamp] = useState('');
   const [invert, setInvert] = useState(false);
   const [glyphBlend, setGlyphBlend] = useState<GlyphBlend>('normal');
+  const [glyphColor, setGlyphColor] = useState('');
   const [cellBasis, setCellBasis] = useState<CellBasis>('M');
   const [lineHeight, setLineHeight] = useState(1);
   const [threshold, setThreshold] = useState(0.45);
@@ -171,6 +218,14 @@ export function App() {
   const [speed, setSpeed] = useState(0.6);
   const [playing, setPlaying] = useState(true);
 
+  // Layers
+  const [bgColor, setBgColor] = useState('#05070c');
+  const [underOn, setUnderOn] = useState(false);
+  const [underColor, setUnderColor] = useState('#1d3b57');
+  const [underOpacity, setUnderOpacity] = useState(0.8);
+  const [glow, setGlow] = useState(false);
+  const [layerOpacity, setLayerOpacity] = useState(1);
+
   // Output
   const [output, setOutput] = useState<Output>('canvas');
   const [zoom, setZoom] = useState(1);
@@ -192,7 +247,10 @@ export function App() {
 
   const time = useAnimationTime({ playing: playing && shimmer > 0, speed });
 
-  const source = loaded?.data ?? null;
+  const frame = useVideoSource(videoRef, { playing: live, maxWidth: 900 });
+  const source = live ? frame : (loaded?.data ?? null);
+  // imageLayer takes any CanvasImageSource, so the backdrop can be the live feed
+  const backdropImage = live ? videoRef.current : loaded?.image ?? null;
 
   const mask = useMemo<Mask | undefined>(() => {
     if (!source || maskKind === 'none') return undefined;
@@ -246,18 +304,83 @@ export function App() {
        gamma, edgeEmphasis, darkThreshold, coverage, preset, saturation, tintOn,
        tintColor, tintBlend, tintOpacity, mask, time, shimmer]);
 
-  const backdrop = useMemo(() => {
-    if (!loaded || backdropKind === 'none' || backdropKind === 'solid') return undefined;
+  const backdrop = useMemo<ImageLayerOptions | undefined>(() => {
+    if (backdropKind === 'none' || backdropKind === 'solid') return undefined;
     return {
-      image: loaded.image,
       blur: backdropKind === 'blurred' ? blur : 0,
       opacity: backdropOpacity,
     };
-  }, [loaded, backdropKind, blur, backdropOpacity]);
+  }, [backdropKind, blur, backdropOpacity]);
 
-  // Only for the stats readout and the text export; AsciiCanvas renders its own.
   const grid = useAsciiGrid(source ?? { width: 0, height: 0, data: new Uint8ClampedArray() },
     render);
+
+  const underCell = cellFor(5, { solid: true, basis: cellBasis, ramp: activeRamp, lineHeight });
+  const underGrid = useAsciiGrid(
+    source ?? { width: 0, height: 0, data: new Uint8ClampedArray() },
+    { mode: 'dither', ...underCell });
+
+  const layers = useMemo<Layer[]>(() => {
+    const stack: Layer[] = [fillLayer(bgColor)];
+    if (backdropImage && backdrop) stack.push(imageLayer(backdropImage, backdrop));
+    if (underOn) {
+      stack.push(asciiLayer(underGrid, {
+        fontSize: 5, ...underCell, color: underColor, opacity: underOpacity,
+      }));
+    }
+    stack.push(asciiLayer(grid, {
+      fontSize,
+      cellWidth: cell.cellWidth,
+      cellHeight: cell.cellHeight,
+      color: glyphColor || undefined,
+      blend: glyphBlend,
+      opacity: layerOpacity,
+      filter: glow ? 'url(#glow)' : undefined,
+    }));
+    return stack;
+  }, [bgColor, backdropImage, backdrop, underOn, underGrid, underCell, underColor,
+      underOpacity, grid, fontSize, cell.cellWidth, cell.cellHeight, glyphColor,
+      glyphBlend, layerOpacity, glow]);
+
+  /** Play a stream or file url through the hidden <video> and sample it. */
+  async function startVideo(attach: (el: HTMLVideoElement) => void) {
+    setLive(true);
+    // the element only mounts once `live` is true, so wait a frame for the ref
+    await new Promise(r => requestAnimationFrame(r));
+    const el = videoRef.current;
+    if (!el) return;
+    attach(el);
+    el.muted = true;
+    el.loop = true;
+    await el.play().catch(() => {});
+  }
+
+  function pickVideo() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'video/*';
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (file) void startVideo(el => { el.src = URL.createObjectURL(file); });
+    };
+    input.click();
+  }
+
+  async function useWebcam() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      await startVideo(el => { el.srcObject = stream; });
+    } catch {
+      setLive(false);
+    }
+  }
+
+  function stopVideo() {
+    const el = videoRef.current;
+    const stream = el?.srcObject as MediaStream | null;
+    stream?.getTracks().forEach(t => t.stop());
+    setLive(false);
+  }
 
   async function pick(setter: (l: Loaded) => void) {
     const input = document.createElement('input');
@@ -279,10 +402,8 @@ export function App() {
 
   function download() {
     if (output === 'svg') {
-      const svg = gridToSvg(grid, {
-        fontSize, cellWidth: cell.cellWidth, cellHeight: cell.cellHeight,
-        background: backdropKind === 'none' ? undefined : '#000',
-      });
+      const svg = layersToSvg(layers,
+        { width: source!.width, height: source!.height, defs: DEFS });
       save(URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' })),
         `ascii-${mode}.svg`);
       return;
@@ -315,10 +436,20 @@ export function App() {
           }}
         >
           Drop an image here, or paste with cmd+V
-          <div style={{ marginTop: 6 }}>
-            <button onClick={() => void pick(setLoaded)}>Choose a file</button>
+          <div style={{ marginTop: 6 }} className="actions">
+            <button onClick={() => void pick(setLoaded)}>Image</button>
+            <button onClick={pickVideo}>Video</button>
+            <button onClick={() => void useWebcam()}>Webcam</button>
+            {live && <button onClick={stopVideo}>Stop</button>}
           </div>
         </div>
+        {live && <div className="meta">live - {source ? `${source.width}×${source.height}` : 'waiting'}</div>}
+        <video
+          ref={videoRef}
+          playsInline
+          muted
+          style={{ display: live ? 'block' : 'none', width: '100%', marginTop: 8, borderRadius: 5 }}
+        />
 
         <h2>Characters</h2>
         <Select label="mode" value={mode} options={MODES} onChange={setMode} />
@@ -395,6 +526,29 @@ export function App() {
             onChange={setBackdropOpacity} />
         )}
 
+        <h2>Layers</h2>
+        <label>
+          <span className="row"><span>background</span></span>
+          <input type="color" value={bgColor} onChange={e => setBgColor(e.target.value)} />
+        </label>
+        <Check label="dither under-layer" value={underOn} onChange={setUnderOn} />
+        {underOn && (
+          <>
+            <input type="color" value={underColor}
+              onChange={e => setUnderColor(e.target.value)} />
+            <Slider label="under opacity" value={underOpacity} min={0} max={1}
+              onChange={setUnderOpacity} />
+          </>
+        )}
+        <Slider label="ascii opacity" value={layerOpacity} min={0} max={1}
+          onChange={setLayerOpacity} />
+        <label>
+          <span className="row"><span>ascii flat colour</span><span>empty uses the cell colour</span></span>
+          <input type="text" value={glyphColor} placeholder="#ffffff"
+            onChange={e => setGlyphColor(e.target.value)} />
+        </label>
+        <Check label="glow filter (svg only)" value={glow} onChange={setGlow} />
+
         <h2>Output</h2>
         <Select label="renderer" value={output} options={OUTPUTS} onChange={setOutput} />
         <Slider label="zoom" value={zoom} min={1} max={6} step={0.5} onChange={setZoom} />
@@ -428,25 +582,13 @@ export function App() {
               </span>
             </div>
 
-            {output === 'canvas' ? (
-              <AsciiCanvas
-                {...render}
-                source={source}
-                fontSize={fontSize}
-                background={backdropKind === 'none' ? undefined : '#000'}
-                backdrop={backdrop}
-                blend={glyphBlend}
-                style={scaled}
-              />
-            ) : (
-              <AsciiSvg
-                {...render}
-                source={source}
-                fontSize={fontSize}
-                background={backdropKind === 'none' ? undefined : '#000'}
-                style={scaled}
-              />
-            )}
+            <LayerStack
+              layers={layers}
+              width={source.width}
+              height={source.height}
+              backend={output}
+              style={scaled}
+            />
 
             {mode !== 'dither' && (
               <details>
