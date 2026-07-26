@@ -147,19 +147,47 @@ export interface ImageLayerOptions extends LayerOptions {
    * the layer in svg output.
    */
   href?: string;
+  /**
+   * Gaussian blur radius in px.
+   *
+   * Prefer this over writing `blur()` into `filter` yourself: a blur kernel at
+   * the frame edge averages in the transparency beyond it and the border goes
+   * dark. Knowing the radius lets the layer bleed the image outwards so the
+   * kernel has real pixels to read.
+   */
+  blur?: number;
 }
+
+/**
+ * How far to bleed a blurred image past the frame.
+ *
+ * Two standard deviations covers most of the kernel's weight; beyond that the
+ * contribution is too small to see, and the bleed is a visible zoom.
+ */
+const BLEED = 2;
 
 /** An image stretched across the whole area. */
 export function imageLayer(
   image: CanvasImageSource,
   options: ImageLayerOptions = {},
 ): Layer {
-  const { href, ...layer } = options;
+  const { href, blur, ...layer } = options;
   const url = href ?? (image as { src?: string }).src;
+  const blurred = blur !== undefined && blur > 0;
+  const filter = blurred
+    ? [layer.filter, `blur(${blur}px)`].filter(Boolean).join(' ')
+    : layer.filter;
+
   return {
     ...layer,
+    filter,
     paintCanvas(ctx, env) {
-      ctx.drawImage(image, 0, 0, env.width, env.height);
+      if (!blurred) {
+        ctx.drawImage(image, 0, 0, env.width, env.height);
+        return;
+      }
+      const bleed = blur * BLEED;
+      ctx.drawImage(image, -bleed, -bleed, env.width + bleed * 2, env.height + bleed * 2);
     },
     toSvgMarkup: env => (url === undefined ? ''
       : `<image href="${url}" x="0" y="0" width="${env.width}" height="${env.height}"` +
