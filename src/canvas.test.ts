@@ -18,6 +18,7 @@ function recorder(width = 40, height = 10) {
     globalCompositeOperation: 'source-over',
     save: () => { calls.push({ op: 'save', args: [] }); },
     setTransform: (...args) => { calls.push({ op: 'setTransform', args }); },
+    measureText: (t: string) => ({ width: 0 }),
     restore: () => { calls.push({ op: 'restore', args: [] }); },
     drawImage: (...args) => { calls.push({ op: 'drawImage', args }); },
     clearRect: (...args) => { calls.push({ op: 'clearRect', args }); },

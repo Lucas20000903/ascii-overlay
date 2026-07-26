@@ -14,6 +14,9 @@ export { rectMask, ellipseMask, polygonMask, imageMask, sampleMask } from './mas
 export { meanColorRect, meanColorCell } from './sample.js';
 export { toDrawList } from './paint.js';
 export { drawToCanvas } from './canvas.js';
+export {
+  paintLayers, layersToSvg, fillLayer, imageLayer, asciiLayer,
+} from './layer.js';
 export { measureCell } from './metrics.js';
 export { gridToText } from './text.js';
 export { gridToSvg } from './svg.js';
@@ -26,6 +29,10 @@ export type { DrawItem, PaintOptions } from './paint.js';
 export type { SvgOptions } from './svg.js';
 export type { Run, RunOptions } from './runs.js';
 export type { Ctx2D, DrawOptions, Backdrop, GlyphBlend } from './canvas.js';
+export type {
+  Layer, LayerOptions, PaintEnv, PaintLayersOptions, LayersToSvgOptions,
+  ImageLayerOptions, AsciiLayerOptions,
+} from './layer.js';
 export type { TextMeasureCtx, MeasureCellOptions, CellMetrics } from './metrics.js';
 export type { RampName } from './charset.js';
 export type { ToneOptions } from './tone.js';

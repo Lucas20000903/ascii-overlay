@@ -1,4 +1,5 @@
-import { toDrawList } from './paint.js';
+import { asciiLayer, fillLayer, imageLayer, paintLayers } from './layer.js';
+import type { Layer } from './layer.js';
 import type { Grid } from './grid.js';
 
 /**
@@ -19,6 +20,7 @@ export interface Ctx2D {
   save(): void;
   restore(): void;
   setTransform(a: number, b: number, c: number, d: number, e: number, f: number): void;
+  measureText(text: string): { width: number };
   clearRect(x: number, y: number, w: number, h: number): void;
   fillRect(x: number, y: number, w: number, h: number): void;
   drawImage(image: CanvasImageSource, x: number, y: number, w: number, h: number): void;
@@ -55,56 +57,44 @@ export interface DrawOptions {
    * sharply on a high-density display. Defaults to 1.
    */
   pixelRatio?: number;
+  /**
+   * Wipe the surface first. Turn it off to stack layers onto one canvas -
+   * each call then composites over what is already there.
+   */
+  clear?: boolean;
   fontFamily?: string;
 }
 
 /**
  * Draw a glyph grid onto a 2D canvas context.
  *
- * Layers, bottom to top: background, backdrop image, glyphs. The backdrop's
- * blur and opacity are wrapped in save/restore so they cannot bleed into the
- * glyphs - a blurred backdrop with sharp text is the whole point.
+ * A convenience wrapper over the layer compositor: background, backdrop and
+ * glyphs are just a three-layer stack. Reach for `paintLayers` directly when
+ * you need more than that.
  */
 export function drawToCanvas(ctx: Ctx2D, grid: Grid, options: DrawOptions): void {
-  const ratio = options.pixelRatio ?? 1;
-  // Everything below works in source pixels; the transform maps them onto the
-  // larger backing store.
-  if (ratio !== 1) ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+  const layers: Layer[] = [];
 
-  const width = ctx.canvas.width / ratio;
-  const height = ctx.canvas.height / ratio;
-
-  if (options.background === undefined) {
-    ctx.clearRect(0, 0, width, height);
-  } else {
-    ctx.fillStyle = options.background;
-    ctx.fillRect(0, 0, width, height);
-  }
+  if (options.background !== undefined) layers.push(fillLayer(options.background));
 
   const backdrop = options.backdrop;
   if (backdrop) {
-    ctx.save();
-    if (backdrop.blur) ctx.filter = `blur(${backdrop.blur}px)`;
-    if (backdrop.opacity !== undefined) ctx.globalAlpha = backdrop.opacity;
-    ctx.drawImage(backdrop.image, 0, 0, width, height);
-    ctx.restore();
+    layers.push(imageLayer(backdrop.image, {
+      filter: backdrop.blur ? `blur(${backdrop.blur}px)` : undefined,
+      opacity: backdrop.opacity,
+    }));
   }
 
-  ctx.font = `${options.fontSize}px ${options.fontFamily ?? 'monospace'}`;
-  ctx.textBaseline = 'top';
+  layers.push(asciiLayer(grid, {
+    fontSize: options.fontSize,
+    color: options.color,
+    fontFamily: options.fontFamily,
+    blend: options.blend,
+  }));
 
-  const blend = options.blend ?? 'normal';
-  if (blend !== 'normal') {
-    ctx.save();
-    ctx.globalCompositeOperation = blend;
-  }
-
-  for (const item of toDrawList(grid, { color: options.color })) {
-    ctx.fillStyle = item.color;
-    ctx.fillText(item.char, item.x, item.y);
-  }
-
-  if (blend !== 'normal') ctx.restore();
-
-  if (ratio !== 1) ctx.setTransform(1, 0, 0, 1, 0, 0);
+  paintLayers(ctx, layers, {
+    pixelRatio: options.pixelRatio,
+    // an opaque background already covers the surface, so skip the wipe
+    clear: options.clear ?? options.background === undefined,
+  });
 }

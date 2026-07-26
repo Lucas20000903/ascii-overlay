@@ -25,6 +25,7 @@ beforeEach(() => {
         globalCompositeOperation: 'source-over',
         save: () => {},
         setTransform: () => {},
+        measureText: (t: string) => ({ width: 0 }),
         restore: () => {},
         clearRect: () => {},
         fillRect: () => {},

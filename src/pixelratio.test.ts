@@ -14,6 +14,7 @@ function recorder(width: number, height: number) {
     save: () => { calls.push({ op: 'save', args: [] }); },
     restore: () => { calls.push({ op: 'restore', args: [] }); },
     setTransform: (...args: unknown[]) => { calls.push({ op: 'setTransform', args }); },
+    measureText: (t: string) => ({ width: 0 }),
     clearRect: (...args: unknown[]) => { calls.push({ op: 'clearRect', args }); },
     fillRect: (...args: unknown[]) => { calls.push({ op: 'fillRect', args }); },
     drawImage: (...args: unknown[]) => { calls.push({ op: 'drawImage', args }); },

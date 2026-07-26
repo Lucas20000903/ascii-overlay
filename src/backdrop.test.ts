@@ -23,6 +23,7 @@ function recorder(width = 40, height = 10) {
     globalAlpha: 1,
     globalCompositeOperation: 'source-over',
     setTransform() {},
+    measureText: (t: string) => ({ width: 0 }),
     save() {
       stack.push({ filter: this.filter, globalAlpha: this.globalAlpha,
                    fillStyle: this.fillStyle as string });

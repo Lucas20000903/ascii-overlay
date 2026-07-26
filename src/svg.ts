@@ -1,4 +1,4 @@
-import { toRuns } from './runs.js';
+import { asciiLayer, layersToSvg, fillLayer } from './layer.js';
 import type { Grid } from './grid.js';
 
 export interface SvgOptions {
@@ -12,44 +12,21 @@ export interface SvgOptions {
   fontFamily?: string;
 }
 
-const ESCAPES: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;' };
-const escapeXml = (s: string) => s.replace(/[&<>]/g, c => ESCAPES[c]!);
-
 /**
  * Serialise a glyph grid as standalone SVG.
  *
- * Glyphs stay vector, so the art is sharp at any zoom - a canvas is fixed to
- * whatever pixel ratio it was drawn at. Each run is pinned with `textLength`
- * so the columns line up even if the viewer's monospace face advances
- * differently from the one the grid was measured against.
+ * A convenience wrapper over the layer compositor. Glyphs stay vector, so the
+ * art is sharp at any zoom - a canvas is fixed to whatever pixel ratio it was
+ * drawn at. Each run is pinned with `textLength` so columns line up even if the
+ * viewer's monospace face advances differently from the measured one.
  */
 export function gridToSvg(grid: Grid, options: SvgOptions): string {
   const { fontSize, cellWidth, cellHeight, background, color, fontFamily } = options;
-  const width = grid.cols * cellWidth;
-  const height = grid.rows * cellHeight;
-
-  const parts: string[] = [
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" ` +
-    `width="${width}" height="${height}">`,
-  ];
-
-  if (background !== undefined) {
-    parts.push(`<rect width="100%" height="100%" fill="${background}"/>`);
-  }
-
-  parts.push(
-    `<g font-family="${fontFamily ?? 'monospace'}" font-size="${fontSize}" ` +
-    `dominant-baseline="text-before-edge" xml:space="preserve">`,
+  return layersToSvg(
+    [
+      ...(background === undefined ? [] : [fillLayer(background)]),
+      asciiLayer(grid, { fontSize, color, fontFamily, cellWidth, cellHeight }),
+    ],
+    { width: grid.cols * cellWidth, height: grid.rows * cellHeight },
   );
-
-  for (const run of toRuns(grid, { color })) {
-    parts.push(
-      `<text x="${run.x}" y="${run.y}" fill="${run.color}" ` +
-      `textLength="${run.cells * cellWidth}" lengthAdjust="spacing">` +
-      `${escapeXml(run.text)}</text>`,
-    );
-  }
-
-  parts.push('</g>', '</svg>');
-  return parts.join('\n');
 }

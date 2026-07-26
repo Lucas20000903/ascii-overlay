@@ -12,6 +12,7 @@ function recorder() {
     fillStyle: '', font: '', textBaseline: '', filter: 'none', globalAlpha: 1,
     globalCompositeOperation: 'source-over',
     setTransform() {},
+    measureText: (t: string) => ({ width: 0 }),
     save() { stack.push(this.globalCompositeOperation); ops.push('save'); },
     restore() {
       const v = stack.pop();
