@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ascii-react playground</title>
+    <style>
+      :root { color-scheme: dark; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; background: #0d0f12; color: #d7dde5;
+        font: 13px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      }
+      #root { display: grid; grid-template-columns: 300px 1fr; min-height: 100vh; }
+      .panel {
+        background: #14181d; border-right: 1px solid #232a33;
+        padding: 16px; overflow-y: auto; max-height: 100vh;
+      }
+      /* align-items would stretch the canvas past its natural width and blur it */
+      .stage {
+        padding: 20px; display: flex; flex-direction: column;
+        align-items: flex-start; gap: 14px; min-width: 0; overflow: auto;
+      }
+      h1 { font-size: 15px; margin: 0 0 14px; letter-spacing: .02em; }
+      h2 {
+        font-size: 11px; text-transform: uppercase; letter-spacing: .09em;
+        color: #7d8894; margin: 20px 0 8px; padding-bottom: 5px;
+        border-bottom: 1px solid #232a33;
+      }
+      h2:first-of-type { margin-top: 0; }
+      label { display: block; margin-bottom: 9px; }
+      .row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+      .row span:last-child { color: #8b96a3; font-variant-numeric: tabular-nums; font-size: 12px; }
+      input[type="range"] { width: 100%; margin: 3px 0 0; }
+      select, input[type="text"], input[type="number"] {
+        width: 100%; background: #0d0f12; color: #d7dde5;
+        border: 1px solid #2b333d; border-radius: 5px; padding: 5px 7px; font: inherit;
+      }
+      input[type="color"] {
+        width: 100%; height: 28px; background: #0d0f12;
+        border: 1px solid #2b333d; border-radius: 5px; padding: 2px;
+      }
+      .check { display: flex; align-items: center; gap: 7px; }
+      .check input { margin: 0; }
+      button {
+        background: #222b36; color: #d7dde5; border: 1px solid #333e4b;
+        border-radius: 5px; padding: 6px 11px; font: inherit; cursor: pointer;
+      }
+      button:hover { background: #2c3844; }
+      .actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+      canvas, svg { display: block; border-radius: 6px; }
+      .meta { color: #7d8894; font-variant-numeric: tabular-nums; }
+      pre {
+        background: #14181d; border: 1px solid #232a33; border-radius: 6px;
+        padding: 10px; overflow: auto; max-height: 240px;
+        font-size: 5px; line-height: 1.05; margin: 0;
+      }
+      .drop { border: 1px dashed #333e4b; border-radius: 6px; padding: 9px; text-align: center; color: #7d8894; }
+      .drop.over { border-color: #5c9ded; color: #a8c8f0; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./main.tsx"></script>
+  </body>
+</html>
