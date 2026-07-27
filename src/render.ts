@@ -7,14 +7,12 @@ import { floydSteinberg } from './dither.js';
 import { sobel } from './edges.js';
 import { gridShape } from './grid.js';
 import { luminance } from './luminance.js';
-import { sampleMask } from './mask.js';
 import { glyphIndex } from './ramp.js';
 import { meanColorRect } from './sample.js';
 import { applyTone } from './tone.js';
 import type { ShimmerOptions } from './animate.js';
 import type { ColorOptions } from './color.js';
 import type { Cell, Grid, RGB, Source } from './grid.js';
-import type { Mask } from './mask.js';
 import type { ToneOptions } from './tone.js';
 
 export type AsciiMode = 'characters' | 'braille' | 'dither';
@@ -56,10 +54,15 @@ export interface RenderOptions {
   grade?: ColorOptions;
 
   // --- Mask ---
-  /** Restricts glyphs to the covered area; elsewhere cells are left blank. */
-  mask?: Mask;
-  /** Coverage a cell needs to count as inside the mask. Defaults to 0.5. */
-  maskThreshold?: number;
+  /**
+   * Restrict where glyphs appear. Cells this rejects are left blank, still in
+   * the grid, so whatever sits below shows through.
+   *
+   * A predicate rather than a shape: rectangles, ellipses, freehand paths and
+   * image mattes are all just functions, and the renderer has no reason to know
+   * which one you meant.
+   */
+  mask?: (col: number, row: number) => boolean;
 
   // --- Animation ---
   animation?: ShimmerOptions;
@@ -140,13 +143,7 @@ function isBlanked(
   if (options.coverage !== undefined &&
       !shouldDraw(col, row, options.coverage, options.coverageSeed ?? 0)) return true;
 
-  if (options.mask) {
-    const { cellWidth, cellHeight } = options;
-    const covered = sampleMask(options.mask,
-      col * cellWidth, row * cellHeight,
-      (col + 1) * cellWidth, (row + 1) * cellHeight);
-    if (covered < (options.maskThreshold ?? 0.5)) return true;
-  }
+  if (options.mask && !options.mask(col, row)) return true;
 
   return false;
 }

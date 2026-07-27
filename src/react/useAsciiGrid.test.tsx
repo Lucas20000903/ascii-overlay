@@ -2,7 +2,6 @@
 import { describe, expect, test } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { useAsciiGrid } from './useAsciiGrid.js';
-import { rectMask } from '../mask.js';
 import type { Source } from '../grid.js';
 
 const solid = (w: number, h: number, v: number): Source => {
@@ -36,7 +35,7 @@ describe('useAsciiGrid', () => {
     const { result } = renderHook(() =>
       useAsciiGrid(solid(4, 1, 255), {
         mode: 'characters', cellWidth: 1, cellHeight: 1, ramp: ' @',
-        mask: rectMask(4, 1, { x: 0, y: 0, width: 2, height: 1 }),
+        mask: (col: number) => col < 2,
       }));
     expect(result.current.cells.map(c => c.char).join('')).toBe('@@  ');
   });

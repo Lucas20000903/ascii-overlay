@@ -1,6 +1,5 @@
 import { describe, expect, test } from 'vitest';
 import { renderAscii } from './render.js';
-import { rectMask } from './mask.js';
 import { RAMPS } from './charset.js';
 import type { Source } from './grid.js';
 
@@ -97,7 +96,8 @@ describe('Color section', () => {
 
 describe('Mask section', () => {
   const source = solid(4, 1, 255);
-  const mask = rectMask(4, 1, { x: 0, y: 0, width: 2, height: 1 });
+  /** Shapes live in user code now; the renderer only sees a predicate. */
+  const mask = (col: number) => col < 2;
 
   test('keeps glyphs inside the mask and blanks the rest', () => {
     expect(chars(source, { mask })).toBe('@@  ');
@@ -106,7 +106,7 @@ describe('Mask section', () => {
   test('applies to braille mode as well', () => {
     const g = renderAscii(solid(4, 4, 255), {
       mode: 'braille', cellWidth: 2, cellHeight: 4,
-      mask: rectMask(4, 4, { x: 0, y: 0, width: 2, height: 4 }),
+      mask: (col: number) => col === 0,
     });
     expect(g.cells.map(c => c.char)).toEqual(['⣿', BLANK_BRAILLE]);
   });
@@ -114,7 +114,7 @@ describe('Mask section', () => {
   test('applies to dither mode as well', () => {
     const g = renderAscii(solid(4, 1, 255), {
       mode: 'dither', cellWidth: 1, cellHeight: 1,
-      mask: rectMask(4, 1, { x: 0, y: 0, width: 2, height: 1 }),
+      mask: (col: number) => col < 2,
     });
     expect(g.cells.map(c => c.char).slice(2)).toEqual([' ', ' ']);
   });
