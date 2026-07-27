@@ -90,6 +90,20 @@ describe('cell background seams', () => {
     })[1]![0]).toBe(7);
   });
 
+  test('can be turned off to keep the exact cell geometry', () => {
+    expect(paint(grid([RED, RED, RED]), { cellBackground: '#222', snapCellBackground: false }))
+      .toEqual([[0, 0, 3 * STEP, ROW]]);
+  });
+
+  test('unsnapped runs still abut, just on fractional bounds', () => {
+    const r = paint(grid([RED, GREEN]), {
+      cellBackground: (c: Cell) => `rgb(${c.color.r},${c.color.g},${c.color.b})`,
+      snapCellBackground: false,
+    });
+    expect(r[1]![0]).toBeCloseTo(r[0]![0]! + r[0]![2]!, 6);
+    expect(Number.isInteger(r[1]![0])).toBe(false);
+  });
+
   test('snaps in svg as well', () => {
     const svg = layersToSvg([asciiLayer(grid([RED, GREEN]), { ...opts, cellBackground:
       (c: Cell) => `rgb(${c.color.r},${c.color.g},${c.color.b})` })], { width: 60, height: 40 });

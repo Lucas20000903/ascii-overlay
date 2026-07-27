@@ -221,6 +221,20 @@ export interface AsciiLayerOptions extends LayerOptions {
    */
   fillBlankCells?: boolean;
   /**
+   * Round the fill rects to whole pixels. Defaults to true.
+   *
+   * Cell steps are fractional - a monospace advance is around 6.62px - so an
+   * exact rect ends mid-pixel and the next begins there. Each covers part of
+   * that pixel and source-over does not add two partial coverages back to
+   * whole, so every seam comes out lighter than the fill: invisible over an
+   * opaque backdrop, a grid of translucent lines over a transparent one.
+   *
+   * Snapping trades up to half a pixel of alignment against its glyph for a
+   * fill that tiles cleanly. Turn it off when the exact geometry matters more,
+   * or when something opaque sits underneath and the seams cannot show.
+   */
+  snapCellBackground?: boolean;
+  /**
    * Displace each glyph from its cell, in source pixels.
    *
    * The cell keeps its place - only the glyph moves - so a per-frame wobble
@@ -264,12 +278,8 @@ interface BackgroundRun {
  * One rect per stretch rather than per cell, for the same reason glyphs are
  * batched into runs. A skipped cell ends the run so the gap stays a gap.
  *
- * Bounds are snapped to whole pixels. Cell steps are fractional - a monospace
- * advance is something like 6.62px - so an unsnapped edge lands mid-pixel and
- * two neighbouring rects each cover part of it. Source-over does not add two
- * partial alphas back to opaque, so on a transparent canvas every seam stays
- * translucent and reads as a grid of darker lines. Snapping makes each rect end
- * exactly where the next begins.
+ * Bounds are rounded to whole pixels unless `snap` says otherwise; see
+ * `snapCellBackground` for what that costs and buys.
  */
 function backgroundRuns(
   grid: Grid,
@@ -277,13 +287,14 @@ function backgroundRuns(
   step: number,
   rowStep: number,
   fillBlanks: boolean,
+  snap: boolean,
 ): BackgroundRun[] {
   const runs: BackgroundRun[] = [];
   let current: { run: BackgroundRun; endCol: number } | null = null;
   let lastCol = -1;
 
-  const left = (col: number) => Math.round(col * step);
-  const top = (row: number) => Math.round(row * rowStep);
+  const left = (col: number) => (snap ? Math.round(col * step) : col * step);
+  const top = (row: number) => (snap ? Math.round(row * rowStep) : row * rowStep);
 
   for (const cell of grid.cells) {
     const skip = !fillBlanks && isBlankGlyph(cell.char);
@@ -322,7 +333,7 @@ function backgroundRuns(
 export function asciiLayer(grid: Grid, options: AsciiLayerOptions): Layer {
   const {
     fontSize, color, fontFamily, cellWidth, cellHeight, cellBackground,
-    fillBlankCells = true, offset, ...layer
+    fillBlankCells = true, snapCellBackground = true, offset, ...layer
   } = options;
   const step = cellWidth ?? cellAdvance(grid) ?? fontSize;
   const rowStep = cellHeight ?? rowAdvance(grid) ?? fontSize;
@@ -332,7 +343,7 @@ export function asciiLayer(grid: Grid, options: AsciiLayerOptions): Layer {
     paintCanvas(ctx) {
       if (cellBackground !== undefined) {
         for (const run of backgroundRuns(
-          grid, cellBackground, step, rowStep, fillBlankCells)) {
+          grid, cellBackground, step, rowStep, fillBlankCells, snapCellBackground)) {
           ctx.fillStyle = run.color;
           ctx.fillRect(run.x, run.y, run.width, run.height);
         }
@@ -379,7 +390,7 @@ export function asciiLayer(grid: Grid, options: AsciiLayerOptions): Layer {
       const parts: string[] = [];
       if (cellBackground !== undefined) {
         for (const run of backgroundRuns(
-          grid, cellBackground, step, rowStep, fillBlankCells)) {
+          grid, cellBackground, step, rowStep, fillBlankCells, snapCellBackground)) {
           parts.push(
             `<rect x="${run.x}" y="${run.y}" width="${run.width}" ` +
             `height="${run.height}" fill="${run.color}"/>`,
