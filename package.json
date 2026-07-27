@@ -1,12 +1,58 @@
 {
-  "name": "ascii-react",
+  "name": "ascii-overlay",
   "version": "0.1.0",
+  "description": "Overlay ASCII art on images and video - characters, braille and dithered modes, canvas and SVG, with no runtime dependencies",
+  "keywords": [
+    "ascii",
+    "ascii-art",
+    "braille",
+    "dither",
+    "floyd-steinberg",
+    "canvas",
+    "svg",
+    "react",
+    "image",
+    "video"
+  ],
+  "license": "MIT",
   "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./react": {
+      "types": "./dist/react/index.d.ts",
+      "default": "./dist/react/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "types": "./dist/index.d.ts",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "sample": "node scripts/make-sample.mjs"
+    "sample": "node scripts/make-sample.mjs",
+    "playground": "vite playground",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@testing-library/dom": "^10.4.1",
@@ -16,27 +62,9 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.4",
     "jsdom": "^29.1.1",
-    "typescript": "^7.0.2",
-    "vitest": "^4.1.10",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
-  },
-  "description": "Image to ASCII art for React and plain JS - characters, braille and dithered modes",
-  "license": "MIT",
-  "sideEffects": false,
-  "files": [
-    "dist"
-  ],
-  "exports": {
-    ".": "./dist/index.js",
-    "./react": "./dist/react/index.js"
-  },
-  "peerDependencies": {
-    "react": ">=18"
-  },
-  "peerDependenciesMeta": {
-    "react": {
-      "optional": true
-    }
+    "react-dom": "^19.2.8",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
   }
 }
