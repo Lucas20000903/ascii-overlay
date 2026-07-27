@@ -1,5 +1,5 @@
 import { toDrawList } from './paint.js';
-import { toRuns } from './runs.js';
+import { isBlankGlyph, toRuns } from './runs.js';
 import type { Ctx2D, GlyphBlend } from './canvas.js';
 import type { Cell, Grid } from './grid.js';
 
@@ -208,10 +208,18 @@ export interface AsciiLayerOptions extends LayerOptions {
    *
    * A string paints every cell alike. A function is called per cell, so
    * `c => \`rgb(${c.color.r},${c.color.g},${c.color.b})\`` turns the art into
-   * colour blocks with the glyphs sitting on top. Blank cells are filled too,
-   * the way a terminal cell has a background even when it holds a space.
+   * colour blocks with the glyphs sitting on top. Returning `null` leaves that
+   * cell unpainted.
    */
-  cellBackground?: string | ((cell: Cell) => string);
+  cellBackground?: string | ((cell: Cell) => string | null);
+  /**
+   * Fill cells holding no glyph. Defaults to true, matching a terminal where
+   * every cell has a background.
+   *
+   * Turn it off to punch the blanks out, so the fill traces the art and
+   * whatever sits below shows through the gaps.
+   */
+  fillBlankCells?: boolean;
 }
 
 const ESCAPES: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;' };
@@ -239,20 +247,25 @@ interface BackgroundRun { x: number; y: number; width: number; color: string }
  * Merge horizontally adjacent cells that share a background colour.
  *
  * One rect per stretch rather than per cell, for the same reason glyphs are
- * batched into runs. Blanks are included: a cell's background does not depend
- * on whether it holds a glyph.
+ * batched into runs. A skipped cell ends the run so the gap stays a gap.
  */
 function backgroundRuns(
   grid: Grid,
-  fill: string | ((cell: Cell) => string),
+  fill: string | ((cell: Cell) => string | null),
   step: number,
+  fillBlanks: boolean,
 ): BackgroundRun[] {
   const runs: BackgroundRun[] = [];
   let current: BackgroundRun | null = null;
   let lastCol = -1;
 
   for (const cell of grid.cells) {
-    const color = typeof fill === 'string' ? fill : fill(cell);
+    const skip = !fillBlanks && isBlankGlyph(cell.char);
+    const color = skip ? null : typeof fill === 'string' ? fill : fill(cell);
+    if (color === null) {
+      current = null;
+      continue;
+    }
     if (current !== null && current.y === cell.y
         && current.color === color && cell.col === lastCol + 1) {
       current.width += step;
@@ -269,7 +282,8 @@ function backgroundRuns(
 /** A glyph grid. */
 export function asciiLayer(grid: Grid, options: AsciiLayerOptions): Layer {
   const {
-    fontSize, color, fontFamily, cellWidth, cellHeight, cellBackground, ...layer
+    fontSize, color, fontFamily, cellWidth, cellHeight, cellBackground,
+    fillBlankCells = true, ...layer
   } = options;
   const step = cellWidth ?? cellAdvance(grid) ?? fontSize;
   const rowStep = cellHeight ?? rowAdvance(grid) ?? fontSize;
@@ -278,7 +292,7 @@ export function asciiLayer(grid: Grid, options: AsciiLayerOptions): Layer {
     ...layer,
     paintCanvas(ctx) {
       if (cellBackground !== undefined) {
-        for (const run of backgroundRuns(grid, cellBackground, step)) {
+        for (const run of backgroundRuns(grid, cellBackground, step, fillBlankCells)) {
           ctx.fillStyle = run.color;
           ctx.fillRect(run.x, run.y, run.width, rowStep);
         }
@@ -310,7 +324,7 @@ export function asciiLayer(grid: Grid, options: AsciiLayerOptions): Layer {
     toSvgMarkup() {
       const parts: string[] = [];
       if (cellBackground !== undefined) {
-        for (const run of backgroundRuns(grid, cellBackground, step)) {
+        for (const run of backgroundRuns(grid, cellBackground, step, fillBlankCells)) {
           parts.push(
             `<rect x="${run.x}" y="${run.y}" width="${run.width}" ` +
             `height="${rowStep}" fill="${run.color}"/>`,

@@ -3,6 +3,9 @@ import type { Grid } from './grid.js';
 /** Glyphs that occupy a cell without marking it. */
 const BLANK = new Set([' ', '⠀']);
 
+/** Whether a glyph leaves its cell unmarked. */
+export const isBlankGlyph = (char: string): boolean => BLANK.has(char);
+
 /** A horizontal stretch of same-coloured glyphs, drawable as one text node. */
 export interface Run {
   text: string;

@@ -20,7 +20,7 @@ export {
 export { measureCell } from './metrics.js';
 export { gridToText } from './text.js';
 export { gridToSvg } from './svg.js';
-export { toRuns } from './runs.js';
+export { toRuns, isBlankGlyph } from './runs.js';
 
 export type { Source, RGB, Cell, Grid, GridOptions } from './grid.js';
 export type { AsciiMode, RenderOptions } from './render.js';
