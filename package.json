@@ -15,6 +15,14 @@
     "video"
   ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Lucas20000903/ascii-overlay.git"
+  },
+  "homepage": "https://github.com/Lucas20000903/ascii-overlay#readme",
+  "bugs": {
+    "url": "https://github.com/Lucas20000903/ascii-overlay/issues"
+  },
   "type": "module",
   "sideEffects": false,
   "files": [
