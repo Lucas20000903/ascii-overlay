@@ -119,6 +119,9 @@ const BACKDROPS: readonly BackdropKind[] = ['none', 'solid', 'original', 'blurre
 const MASK_FROMS: readonly MaskFrom[] = ['alpha', 'luminance'];
 const CELL_BASES: readonly CellBasis[] = ['M', 'ramp mean'];
 
+type CellBg = 'none' | 'flat' | 'cell colour';
+const CELL_BGS: readonly CellBg[] = ['none', 'flat', 'cell colour'];
+
 type Output = 'canvas' | 'svg';
 const OUTPUTS: readonly Output[] = ['canvas', 'svg'];
 
@@ -219,7 +222,10 @@ export function App() {
   const [playing, setPlaying] = useState(true);
 
   // Layers
+  const [transparent, setTransparent] = useState(false);
   const [bgColor, setBgColor] = useState('#05070c');
+  const [cellBg, setCellBg] = useState<CellBg>('none');
+  const [cellBgColor, setCellBgColor] = useState('#101820');
   const [underOn, setUnderOn] = useState(false);
   const [underColor, setUnderColor] = useState('#1d3b57');
   const [underOpacity, setUnderOpacity] = useState(0.8);
@@ -321,7 +327,7 @@ export function App() {
     { mode: 'dither', ...underCell });
 
   const layers = useMemo<Layer[]>(() => {
-    const stack: Layer[] = [fillLayer(bgColor)];
+    const stack: Layer[] = transparent ? [] : [fillLayer(bgColor)];
     if (backdropImage && backdrop) stack.push(imageLayer(backdropImage, backdrop));
     if (underOn) {
       stack.push(asciiLayer(underGrid, {
@@ -332,15 +338,18 @@ export function App() {
       fontSize,
       cellWidth: cell.cellWidth,
       cellHeight: cell.cellHeight,
+      cellBackground: cellBg === 'none' ? undefined
+        : cellBg === 'flat' ? cellBgColor
+        : c => `rgb(${c.color.r},${c.color.g},${c.color.b})`,
       color: glyphColor || undefined,
       blend: glyphBlend,
       opacity: layerOpacity,
       filter: glow ? 'url(#glow)' : undefined,
     }));
     return stack;
-  }, [bgColor, backdropImage, backdrop, underOn, underGrid, underCell, underColor,
-      underOpacity, grid, fontSize, cell.cellWidth, cell.cellHeight, glyphColor,
-      glyphBlend, layerOpacity, glow]);
+  }, [transparent, bgColor, cellBg, cellBgColor, backdropImage, backdrop, underOn,
+      underGrid, underCell, underColor, underOpacity, grid, fontSize,
+      cell.cellWidth, cell.cellHeight, glyphColor, glyphBlend, layerOpacity, glow]);
 
   /** Play a stream or file url through the hidden <video> and sample it. */
   async function startVideo(attach: (el: HTMLVideoElement) => void) {
@@ -527,10 +536,19 @@ export function App() {
         )}
 
         <h2>Layers</h2>
-        <label>
-          <span className="row"><span>background</span></span>
-          <input type="color" value={bgColor} onChange={e => setBgColor(e.target.value)} />
-        </label>
+        <Check label="transparent background" value={transparent} onChange={setTransparent} />
+        {!transparent && (
+          <label>
+            <span className="row"><span>background</span></span>
+            <input type="color" value={bgColor} onChange={e => setBgColor(e.target.value)} />
+          </label>
+        )}
+        <Select label="cell background" value={cellBg} options={CELL_BGS}
+          onChange={setCellBg} />
+        {cellBg === 'flat' && (
+          <input type="color" value={cellBgColor}
+            onChange={e => setCellBgColor(e.target.value)} />
+        )}
         <Check label="dither under-layer" value={underOn} onChange={setUnderOn} />
         {underOn && (
           <>
@@ -582,6 +600,7 @@ export function App() {
               </span>
             </div>
 
+            <div className={transparent ? 'checker' : undefined}>
             <LayerStack
               layers={layers}
               width={source.width}
@@ -589,6 +608,7 @@ export function App() {
               backend={output}
               style={scaled}
             />
+            </div>
 
             {mode !== 'dither' && (
               <details>

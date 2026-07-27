@@ -49,6 +49,16 @@
       button:hover { background: #2c3844; }
       .actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
       canvas, svg { display: block; border-radius: 6px; }
+      /* so a transparent render reads as transparent rather than as the page */
+      .checker {
+        border-radius: 6px; overflow: hidden;
+        background-image:
+          linear-gradient(45deg, #2a2f36 25%, transparent 25%, transparent 75%, #2a2f36 75%),
+          linear-gradient(45deg, #2a2f36 25%, transparent 25%, transparent 75%, #2a2f36 75%);
+        background-size: 16px 16px;
+        background-position: 0 0, 8px 8px;
+        background-color: #1a1e24;
+      }
       .meta { color: #7d8894; font-variant-numeric: tabular-nums; }
       pre {
         background: #14181d; border: 1px solid #232a33; border-radius: 6px;
