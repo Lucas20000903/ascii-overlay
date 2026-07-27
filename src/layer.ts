@@ -220,6 +220,18 @@ export interface AsciiLayerOptions extends LayerOptions {
    * whatever sits below shows through the gaps.
    */
   fillBlankCells?: boolean;
+  /**
+   * Displace each glyph from its cell, in source pixels.
+   *
+   * The cell keeps its place - only the glyph moves - so a per-frame wobble
+   * reads as the drawing shaking rather than the grid sliding. Warping the
+   * source image instead barely survives the cell averaging: a 2px displacement
+   * changes under 1% of glyphs on a 6.6x8px grid.
+   *
+   * Runs cannot batch when glyphs move independently, so this costs one draw
+   * per glyph.
+   */
+  offset?: (cell: Cell) => { x: number; y: number };
 }
 
 const ESCAPES: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;' };
@@ -283,7 +295,7 @@ function backgroundRuns(
 export function asciiLayer(grid: Grid, options: AsciiLayerOptions): Layer {
   const {
     fontSize, color, fontFamily, cellWidth, cellHeight, cellBackground,
-    fillBlankCells = true, ...layer
+    fillBlankCells = true, offset, ...layer
   } = options;
   const step = cellWidth ?? cellAdvance(grid) ?? fontSize;
   const rowStep = cellHeight ?? rowAdvance(grid) ?? fontSize;
@@ -312,17 +324,26 @@ export function asciiLayer(grid: Grid, options: AsciiLayerOptions): Layer {
       const narrow = ctx.measureText('i').width;
       const monospaced = Math.abs(wide - narrow) < 0.05;
       const step2 = cellAdvance(grid);
-      const batch = monospaced && step2 !== null && Math.abs(step2 - wide) < 0.05;
+      const batch = offset === undefined && monospaced
+        && step2 !== null && Math.abs(step2 - wide) < 0.05;
 
       if (batch) {
         for (const run of toRuns(grid, { color })) {
           ctx.fillStyle = run.color;
           ctx.fillText(run.text, run.x, run.y);
         }
-      } else {
+      } else if (offset === undefined) {
         for (const item of toDrawList(grid, { color })) {
           ctx.fillStyle = item.color;
           ctx.fillText(item.char, item.x, item.y);
+        }
+      } else {
+        for (const cell of grid.cells) {
+          if (isBlankGlyph(cell.char)) continue;
+          const d = offset(cell);
+          ctx.fillStyle = color
+            ?? `rgb(${cell.color.r},${cell.color.g},${cell.color.b})`;
+          ctx.fillText(cell.char, cell.x + d.x, cell.y + d.y);
         }
       }
     },
@@ -340,12 +361,24 @@ export function asciiLayer(grid: Grid, options: AsciiLayerOptions): Layer {
         `<g font-family="${fontFamily ?? 'monospace'}" font-size="${fontSize}" ` +
         'dominant-baseline="text-before-edge" xml:space="preserve">',
       );
-      for (const run of toRuns(grid, { color })) {
-        parts.push(
-          `<text x="${run.x}" y="${run.y}" fill="${run.color}" ` +
-          `textLength="${run.cells * step}" lengthAdjust="spacing">` +
-          `${escapeXml(run.text)}</text>`,
-        );
+      if (offset === undefined) {
+        for (const run of toRuns(grid, { color })) {
+          parts.push(
+            `<text x="${run.x}" y="${run.y}" fill="${run.color}" ` +
+            `textLength="${run.cells * step}" lengthAdjust="spacing">` +
+            `${escapeXml(run.text)}</text>`,
+          );
+        }
+      } else {
+        for (const cell of grid.cells) {
+          if (isBlankGlyph(cell.char)) continue;
+          const d = offset(cell);
+          const fill = color ?? `rgb(${cell.color.r},${cell.color.g},${cell.color.b})`;
+          parts.push(
+            `<text x="${cell.x + d.x}" y="${cell.y + d.y}" fill="${fill}">` +
+            `${escapeXml(cell.char)}</text>`,
+          );
+        }
       }
       parts.push('</g>');
       return parts.join('\n');
