@@ -1,15 +1,13 @@
 import { asciiLayer, layersToSvg, fillLayer } from './layer.js';
+import type { AsciiLayerOptions } from './layer.js';
 import type { Grid } from './grid.js';
 
-export interface SvgOptions {
-  fontSize: number;
+export interface SvgOptions
+  extends Omit<AsciiLayerOptions, 'blend' | 'opacity' | 'filter'> {
   cellWidth: number;
   cellHeight: number;
   /** Painted behind the glyphs. Omit to leave the svg transparent. */
   background?: string;
-  /** Draw every glyph in this colour instead of its cell colour. */
-  color?: string;
-  fontFamily?: string;
 }
 
 /**
@@ -21,12 +19,15 @@ export interface SvgOptions {
  * viewer's monospace face advances differently from the measured one.
  */
 export function gridToSvg(grid: Grid, options: SvgOptions): string {
-  const { fontSize, cellWidth, cellHeight, background, color, fontFamily } = options;
+  const { background, ...glyph } = options;
   return layersToSvg(
     [
       ...(background === undefined ? [] : [fillLayer(background)]),
-      asciiLayer(grid, { fontSize, color, fontFamily, cellWidth, cellHeight }),
+      asciiLayer(grid, glyph),
     ],
-    { width: grid.cols * cellWidth, height: grid.rows * cellHeight },
+    {
+      width: grid.cols * options.cellWidth,
+      height: grid.rows * options.cellHeight,
+    },
   );
 }

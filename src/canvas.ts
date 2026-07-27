@@ -1,5 +1,5 @@
 import { asciiLayer, fillLayer, imageLayer, paintLayers } from './layer.js';
-import type { Layer } from './layer.js';
+import type { AsciiLayerOptions, Layer } from './layer.js';
 import type { Grid } from './grid.js';
 
 /**
@@ -40,7 +40,10 @@ export interface Backdrop {
 export type GlyphBlend =
   | 'normal' | 'screen' | 'overlay' | 'color-dodge' | 'lighter';
 
-export interface DrawOptions {
+/** Everything the glyph layer accepts, minus what the compositor owns. */
+type GlyphOptions = Omit<AsciiLayerOptions, 'blend' | 'opacity' | 'filter'>;
+
+export interface DrawOptions extends Omit<GlyphOptions, 'fontSize'> {
   /** Glyph size in pixels; also the monospace font size. */
   fontSize: number;
   /** Painted behind everything. Omit to leave the canvas transparent. */
@@ -77,20 +80,16 @@ export function drawToCanvas(ctx: Ctx2D, grid: Grid, options: DrawOptions): void
 
   if (options.background !== undefined) layers.push(fillLayer(options.background));
 
-  const backdrop = options.backdrop;
-  if (backdrop) {
+  if (options.backdrop) {
+    const backdrop = options.backdrop;
     layers.push(imageLayer(backdrop.image, {
       filter: backdrop.blur ? `blur(${backdrop.blur}px)` : undefined,
       opacity: backdrop.opacity,
     }));
   }
 
-  layers.push(asciiLayer(grid, {
-    fontSize: options.fontSize,
-    color: options.color,
-    fontFamily: options.fontFamily,
-    blend: options.blend,
-  }));
+  const { background, backdrop, blend, pixelRatio, clear, ...glyph } = options;
+  layers.push(asciiLayer(grid, { ...glyph, blend }));
 
   paintLayers(ctx, layers, {
     pixelRatio: options.pixelRatio,

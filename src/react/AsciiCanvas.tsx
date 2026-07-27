@@ -2,11 +2,15 @@ import { useEffect, useRef } from 'react';
 import type { CSSProperties } from 'react';
 import { drawToCanvas } from '../canvas.js';
 import { useAsciiGrid } from './useAsciiGrid.js';
-import type { Backdrop, GlyphBlend } from '../canvas.js';
+import type { Backdrop, DrawOptions, GlyphBlend } from '../canvas.js';
 import type { RenderOptions } from '../render.js';
 import type { Source } from '../grid.js';
 
-export interface AsciiCanvasProps extends RenderOptions {
+type GlyphProps = Omit<DrawOptions,
+  'fontSize' | 'background' | 'backdrop' | 'color' | 'blend' | 'pixelRatio'
+  | 'fontFamily' | 'cellWidth' | 'cellHeight'>;
+
+export interface AsciiCanvasProps extends RenderOptions, GlyphProps {
   source: Source;
   /** Glyph size in pixels. Defaults to the cell height. */
   fontSize?: number;
@@ -31,7 +35,7 @@ export interface AsciiCanvasProps extends RenderOptions {
 /** Draw a source image as ASCII art on a canvas. */
 export function AsciiCanvas({
   source, fontSize, background, backdrop, color, blend, pixelRatio, fontFamily,
-  className, style, ...options
+  cellBackground, fillBlankCells, offset, className, style, ...options
 }: AsciiCanvasProps) {
   const ref = useRef<HTMLCanvasElement>(null);
   const grid = useAsciiGrid(source, options);
@@ -43,9 +47,11 @@ export function AsciiCanvas({
     const ctx = ref.current?.getContext('2d');
     if (!ctx) return;
     drawToCanvas(ctx, grid, {
-      fontSize: size, background, backdrop, color, blend, fontFamily, pixelRatio: ratio,
+      fontSize: size, background, backdrop, color, blend, fontFamily,
+      cellBackground, fillBlankCells, offset, pixelRatio: ratio,
     });
-  }, [grid, size, background, backdrop, color, blend, fontFamily, ratio]);
+  }, [grid, size, background, backdrop, color, blend, fontFamily,
+      cellBackground, fillBlankCells, offset, ratio]);
 
   return (
     <canvas

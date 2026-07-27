@@ -1,11 +1,16 @@
 import { useMemo } from 'react';
 import type { CSSProperties } from 'react';
-import { toRuns } from '../runs.js';
+import { asciiLayer } from '../layer.js';
 import { useAsciiGrid } from './useAsciiGrid.js';
+import type { AsciiLayerOptions } from '../layer.js';
 import type { RenderOptions } from '../render.js';
 import type { Source } from '../grid.js';
 
-export interface AsciiSvgProps extends RenderOptions {
+type GlyphProps = Omit<AsciiLayerOptions,
+  'fontSize' | 'color' | 'fontFamily' | 'cellWidth' | 'cellHeight'
+  | 'blend' | 'opacity' | 'filter'>;
+
+export interface AsciiSvgProps extends RenderOptions, GlyphProps {
   source: Source;
   /** Glyph size in pixels. Defaults to the cell height. */
   fontSize?: number;
@@ -22,17 +27,34 @@ export interface AsciiSvgProps extends RenderOptions {
  * Draw a source image as ASCII art in SVG.
  *
  * Glyphs stay vector, so the art is sharp however far it is scaled - unlike
- * `AsciiCanvas`, which is fixed to the pixel ratio it was drawn at. The cost is
- * a text node per colour run rather than a single bitmap.
+ * `AsciiCanvas`, which is fixed to the pixel ratio it was drawn at.
+ *
+ * The glyph markup comes from `asciiLayer`, the same code the layer compositor
+ * uses. Rendering it here as React elements instead would be a second
+ * implementation to keep in step, and the first time they drifted the component
+ * quietly lost every option the layer had gained.
  */
 export function AsciiSvg({
-  source, fontSize, background, color, fontFamily, className, style, ...options
+  source, fontSize, background, color, fontFamily,
+  cellBackground, fillBlankCells, offset, className, style, ...options
 }: AsciiSvgProps) {
   const grid = useAsciiGrid(source, options);
-  const runs = useMemo(() => toRuns(grid, { color }), [grid, color]);
 
   const width = grid.cols * options.cellWidth;
   const height = grid.rows * options.cellHeight;
+
+  const markup = useMemo(() => asciiLayer(grid, {
+    fontSize: fontSize ?? options.cellHeight,
+    color,
+    fontFamily,
+    cellWidth: options.cellWidth,
+    cellHeight: options.cellHeight,
+    cellBackground,
+    fillBlankCells,
+    offset,
+  }).toSvgMarkup({ width, height }),
+  [grid, fontSize, color, fontFamily, options.cellWidth, options.cellHeight,
+   cellBackground, fillBlankCells, offset, width, height]);
 
   return (
     <svg
@@ -46,25 +68,7 @@ export function AsciiSvg({
       {background !== undefined && (
         <rect width="100%" height="100%" fill={background} />
       )}
-      <g
-        fontFamily={fontFamily ?? 'monospace'}
-        fontSize={fontSize ?? options.cellHeight}
-        dominantBaseline="text-before-edge"
-        xmlSpace="preserve"
-      >
-        {runs.map((run, i) => (
-          <text
-            key={`${run.y}-${run.x}-${i}`}
-            x={run.x}
-            y={run.y}
-            fill={run.color}
-            textLength={run.cells * options.cellWidth}
-            lengthAdjust="spacing"
-          >
-            {run.text}
-          </text>
-        ))}
-      </g>
+      <g dangerouslySetInnerHTML={{ __html: markup }} />
     </svg>
   );
 }
