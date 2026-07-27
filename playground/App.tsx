@@ -93,14 +93,17 @@ type CellBasis = 'M' | 'ramp mean';
  */
 function cellFor(
   fontSize: number,
-  opts: { solid: boolean; basis: CellBasis; ramp: string; lineHeight: number },
+  opts: { solid: boolean; basis: CellBasis; ramp: string; lineHeight: number;
+          fontFamily: string },
 ) {
   const ctx = document.createElement('canvas').getContext('2d')!;
-  const { lineHeight } = opts;
-  if (opts.solid) return measureCell(ctx, fontSize, { sample: '\u2588', lineHeight });
+  const { lineHeight, fontFamily } = opts;
+  if (opts.solid) {
+    return measureCell(ctx, fontSize, { sample: '\u2588', lineHeight, fontFamily });
+  }
   return opts.basis === 'ramp mean'
-    ? measureCell(ctx, fontSize, { ramp: opts.ramp, lineHeight })
-    : measureCell(ctx, fontSize, { lineHeight });
+    ? measureCell(ctx, fontSize, { ramp: opts.ramp, lineHeight, fontFamily })
+    : measureCell(ctx, fontSize, { lineHeight, fontFamily });
 }
 
 type MaskKind = 'none' | 'ellipse' | 'rect' | 'image';
@@ -121,6 +124,18 @@ const CELL_BASES: readonly CellBasis[] = ['M', 'ramp mean'];
 
 type CellBg = 'none' | 'flat' | 'cell colour';
 const CELL_BGS: readonly CellBg[] = ['none', 'flat', 'cell colour'];
+
+const FONTS: readonly string[] = [
+  'monospace', 'ui-monospace', 'Menlo', 'Monaco', 'Courier New',
+  'serif', 'Georgia',
+];
+
+/** Whether a face advances every glyph the same, which the grid relies on. */
+function isMonospaced(family: string, size: number): boolean {
+  const ctx = document.createElement('canvas').getContext('2d')!;
+  ctx.font = `${size}px ${family}`;
+  return Math.abs(ctx.measureText('M').width - ctx.measureText('i').width) < 0.05;
+}
 
 type Output = 'canvas' | 'svg';
 const OUTPUTS: readonly Output[] = ['canvas', 'svg'];
@@ -186,6 +201,8 @@ export function App() {
   const [glyphBlend, setGlyphBlend] = useState<GlyphBlend>('normal');
   const [glyphColor, setGlyphColor] = useState('');
   const [cellBasis, setCellBasis] = useState<CellBasis>('M');
+  const [fontFamily, setFontFamily] = useState('monospace');
+  const [customFont, setCustomFont] = useState('');
   const [lineHeight, setLineHeight] = useState(1);
   const [threshold, setThreshold] = useState(0.45);
 
@@ -284,8 +301,12 @@ export function App() {
 
   const activeRamp = customRamp.length > 0 ? customRamp : RAMPS[rampName];
   const solidRamp = mode === 'dither' || (customRamp.length === 0 && rampName === 'blocks');
-  const cell = cellFor(fontSize,
-    { solid: solidRamp, basis: cellBasis, ramp: activeRamp, lineHeight });
+  const activeFont = customFont.trim() || fontFamily;
+  const cell = cellFor(fontSize, {
+    solid: solidRamp, basis: cellBasis, ramp: activeRamp, lineHeight,
+    fontFamily: activeFont,
+  });
+  const monospaced = isMonospaced(activeFont, fontSize);
 
   const render = useMemo(() => ({
     mode,
@@ -344,6 +365,7 @@ export function App() {
         : c => `rgb(${c.color.r},${c.color.g},${c.color.b})`,
       fillBlankCells: fillBlanks,
       color: glyphColor || undefined,
+      fontFamily: activeFont,
       blend: glyphBlend,
       opacity: layerOpacity,
       filter: glow ? 'url(#glow)' : undefined,
@@ -351,7 +373,8 @@ export function App() {
     return stack;
   }, [transparent, bgColor, cellBg, cellBgColor, fillBlanks, backdropImage, backdrop, underOn,
       underGrid, underCell, underColor, underOpacity, grid, fontSize,
-      cell.cellWidth, cell.cellHeight, glyphColor, glyphBlend, layerOpacity, glow]);
+      cell.cellWidth, cell.cellHeight, glyphColor, activeFont, glyphBlend,
+      layerOpacity, glow]);
 
   /** Play a stream or file url through the hidden <video> and sample it. */
   async function startVideo(attach: (el: HTMLVideoElement) => void) {
@@ -475,6 +498,15 @@ export function App() {
         <Check label="invert" value={invert} onChange={setInvert} />
         <Select label="glyph blend" value={glyphBlend} options={GLYPH_BLENDS}
           onChange={setGlyphBlend} />
+        <Select label="font" value={fontFamily} options={FONTS} onChange={setFontFamily} />
+        <label>
+          <span className="row">
+            <span>custom font</span>
+            <span>{monospaced ? 'monospaced' : 'proportional, falls back to per-glyph'}</span>
+          </span>
+          <input type="text" value={customFont} placeholder="empty uses the list above"
+            onChange={e => setCustomFont(e.target.value)} />
+        </label>
         <Select label="cell height from" value={cellBasis} options={CELL_BASES}
           onChange={setCellBasis} />
         <Slider label="lineHeight" value={lineHeight} min={0.5} max={1.6}
