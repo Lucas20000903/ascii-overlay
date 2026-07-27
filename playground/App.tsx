@@ -130,22 +130,30 @@ const FONTS: readonly string[] = [
   'serif', 'Georgia',
 ];
 
-/**
- * Squigglevision: a per-glyph wobble that changes a few times a second.
- *
- * Deliberately written here rather than in the library - it is one use of the
- * generic offset hook, not something the renderer should know about.
- */
-function squiggle(frame: number, amp: number) {
-  return (c: Cell) => {
-    const h = Math.imul(
-      (c.col * 73856093) ^ (c.row * 19349663) ^ (frame * 83492791), 0x2545f491);
-    return {
-      x: ((h & 0xff) / 255 - 0.5) * 2 * amp,
-      y: (((h >>> 8) & 0xff) / 255 - 0.5) * 2 * amp,
-    };
+type SquiggleMode = 'image' | 'glyph';
+const SQUIGGLE_MODES: readonly SquiggleMode[] = ['image', 'glyph'];
+
+/** Stable-per-frame wobble for one cell. */
+function wobble(col: number, row: number, frame: number, amp: number) {
+  const h = Math.imul((col * 73856093) ^ (row * 19349663) ^ (frame * 83492791), 0x2545f491);
+  return {
+    x: ((h & 0xff) / 255 - 0.5) * 2 * amp,
+    y: (((h >>> 8) & 0xff) / 255 - 0.5) * 2 * amp,
   };
 }
+
+/**
+ * Squigglevision, written here rather than in the library: it is one use of two
+ * generic hooks, not something the renderer should know about.
+ *
+ * `image` shakes what each cell reads, so the picture wobbles underneath and
+ * the glyphs change to follow. `glyph` shakes where the glyph is drawn, leaving
+ * the choice of glyph alone. They look quite different.
+ */
+const squiggleSample = (frame: number, amp: number) =>
+  (col: number, row: number) => wobble(col, row, frame, amp);
+const squiggleGlyph = (frame: number, amp: number) =>
+  (c: Cell) => wobble(c.col, c.row, frame, amp);
 
 /** Whether a face advances every glyph the same, which the grid relies on. */
 function isMonospaced(family: string, size: number): boolean {
@@ -252,6 +260,7 @@ export function App() {
 
   // Animation
   const [squiggleAmp, setSquiggleAmp] = useState(0);
+  const [squiggleMode, setSquiggleMode] = useState<SquiggleMode>('image');
   const [squiggleFps, setSquiggleFps] = useState(8);
   const [shimmer, setShimmer] = useState(0);
   const [speed, setSpeed] = useState(0.6);
@@ -336,6 +345,8 @@ export function App() {
     cellWidth: cell.cellWidth,
     cellHeight: cell.cellHeight,
     ramp: customRamp.length > 0 ? customRamp : rampName,
+    sampleOffset: squiggleAmp > 0 && squiggleMode === 'image'
+      ? squiggleSample(squiggleFrame, squiggleAmp) : undefined,
     invert,
     threshold,
     tone: { contrast, brightness, gamma },
@@ -351,7 +362,8 @@ export function App() {
     },
     mask,
     animation: { time, shimmer },
-  }), [mode, cell.cellWidth, cell.cellHeight, customRamp, rampName, invert, threshold, contrast, brightness,
+  }), [mode, cell.cellWidth, cell.cellHeight, customRamp, rampName, invert, threshold,
+       squiggleAmp, squiggleMode, squiggleFrame, contrast, brightness,
        gamma, edgeEmphasis, darkThreshold, coverage, preset, saturation, tintOn,
        tintColor, tintBlend, tintOpacity, mask, time, shimmer]);
 
@@ -389,7 +401,8 @@ export function App() {
       fillBlankCells: fillBlanks,
       color: glyphColor || undefined,
       fontFamily: activeFont,
-      offset: squiggleAmp > 0 ? squiggle(squiggleFrame, squiggleAmp) : undefined,
+      offset: squiggleAmp > 0 && squiggleMode === 'glyph'
+        ? squiggleGlyph(squiggleFrame, squiggleAmp) : undefined,
       blend: glyphBlend,
       opacity: layerOpacity,
       filter: glow ? 'url(#glow)' : undefined,
@@ -398,7 +411,7 @@ export function App() {
   }, [transparent, bgColor, cellBg, cellBgColor, fillBlanks, backdropImage, backdrop, underOn,
       underGrid, underCell, underColor, underOpacity, grid, fontSize,
       cell.cellWidth, cell.cellHeight, glyphColor, activeFont, squiggleAmp,
-      squiggleFrame, glyphBlend, layerOpacity, glow]);
+      squiggleMode, squiggleFrame, glyphBlend, layerOpacity, glow]);
 
   /** Play a stream or file url through the hidden <video> and sample it. */
   async function startVideo(attach: (el: HTMLVideoElement) => void) {
@@ -641,8 +654,12 @@ export function App() {
         <Slider label="squiggle" value={squiggleAmp} min={0} max={4} step={0.1}
           onChange={setSquiggleAmp} />
         {squiggleAmp > 0 && (
-          <Slider label="squiggle fps" value={squiggleFps} min={1} max={24} step={1}
-            onChange={setSquiggleFps} />
+          <>
+            <Select label="squiggle target" value={squiggleMode}
+              options={SQUIGGLE_MODES} onChange={setSquiggleMode} />
+            <Slider label="squiggle fps" value={squiggleFps} min={1} max={24} step={1}
+              onChange={setSquiggleFps} />
+          </>
         )}
         <Slider label="shimmer" value={shimmer} min={0} max={6} step={0.1}
           onChange={setShimmer} />
