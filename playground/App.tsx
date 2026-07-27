@@ -130,6 +130,23 @@ const FONTS: readonly string[] = [
   'serif', 'Georgia',
 ];
 
+/**
+ * Squigglevision: a per-glyph wobble that changes a few times a second.
+ *
+ * Deliberately written here rather than in the library - it is one use of the
+ * generic offset hook, not something the renderer should know about.
+ */
+function squiggle(frame: number, amp: number) {
+  return (c: Cell) => {
+    const h = Math.imul(
+      (c.col * 73856093) ^ (c.row * 19349663) ^ (frame * 83492791), 0x2545f491);
+    return {
+      x: ((h & 0xff) / 255 - 0.5) * 2 * amp,
+      y: (((h >>> 8) & 0xff) / 255 - 0.5) * 2 * amp,
+    };
+  };
+}
+
 /** Whether a face advances every glyph the same, which the grid relies on. */
 function isMonospaced(family: string, size: number): boolean {
   const ctx = document.createElement('canvas').getContext('2d')!;
@@ -234,6 +251,8 @@ export function App() {
   const [backdropOpacity, setBackdropOpacity] = useState(0.85);
 
   // Animation
+  const [squiggleAmp, setSquiggleAmp] = useState(0);
+  const [squiggleFps, setSquiggleFps] = useState(8);
   const [shimmer, setShimmer] = useState(0);
   const [speed, setSpeed] = useState(0.6);
   const [playing, setPlaying] = useState(true);
@@ -269,7 +288,11 @@ export function App() {
     return () => document.removeEventListener('paste', onPaste);
   }, []);
 
-  const time = useAnimationTime({ playing: playing && shimmer > 0, speed });
+  const time = useAnimationTime({
+    playing: playing && (shimmer > 0 || squiggleAmp > 0), speed,
+  });
+  // squigglevision holds each wobble for a beat instead of changing every frame
+  const squiggleFrame = Math.floor(time * squiggleFps);
 
   const frame = useVideoSource(videoRef, { playing: live, maxWidth: 900 });
   const source = live ? frame : (loaded?.data ?? null);
@@ -366,6 +389,7 @@ export function App() {
       fillBlankCells: fillBlanks,
       color: glyphColor || undefined,
       fontFamily: activeFont,
+      offset: squiggleAmp > 0 ? squiggle(squiggleFrame, squiggleAmp) : undefined,
       blend: glyphBlend,
       opacity: layerOpacity,
       filter: glow ? 'url(#glow)' : undefined,
@@ -373,8 +397,8 @@ export function App() {
     return stack;
   }, [transparent, bgColor, cellBg, cellBgColor, fillBlanks, backdropImage, backdrop, underOn,
       underGrid, underCell, underColor, underOpacity, grid, fontSize,
-      cell.cellWidth, cell.cellHeight, glyphColor, activeFont, glyphBlend,
-      layerOpacity, glow]);
+      cell.cellWidth, cell.cellHeight, glyphColor, activeFont, squiggleAmp,
+      squiggleFrame, glyphBlend, layerOpacity, glow]);
 
   /** Play a stream or file url through the hidden <video> and sample it. */
   async function startVideo(attach: (el: HTMLVideoElement) => void) {
@@ -614,6 +638,12 @@ export function App() {
         </div>
 
         <h2>Animation</h2>
+        <Slider label="squiggle" value={squiggleAmp} min={0} max={4} step={0.1}
+          onChange={setSquiggleAmp} />
+        {squiggleAmp > 0 && (
+          <Slider label="squiggle fps" value={squiggleFps} min={1} max={24} step={1}
+            onChange={setSquiggleFps} />
+        )}
         <Slider label="shimmer" value={shimmer} min={0} max={6} step={0.1}
           onChange={setShimmer} />
         <Slider label="speed" value={speed} min={0} max={3} onChange={setSpeed} />
