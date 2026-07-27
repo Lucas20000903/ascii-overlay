@@ -253,23 +253,37 @@ function rowAdvance(grid: Grid): number | null {
   return a && b ? b.y - a.y : null;
 }
 
-interface BackgroundRun { x: number; y: number; width: number; color: string }
+/** Whole-pixel rectangle for one stretch of cells. */
+interface BackgroundRun {
+  x: number; y: number; width: number; height: number; color: string;
+}
 
 /**
  * Merge horizontally adjacent cells that share a background colour.
  *
  * One rect per stretch rather than per cell, for the same reason glyphs are
  * batched into runs. A skipped cell ends the run so the gap stays a gap.
+ *
+ * Bounds are snapped to whole pixels. Cell steps are fractional - a monospace
+ * advance is something like 6.62px - so an unsnapped edge lands mid-pixel and
+ * two neighbouring rects each cover part of it. Source-over does not add two
+ * partial alphas back to opaque, so on a transparent canvas every seam stays
+ * translucent and reads as a grid of darker lines. Snapping makes each rect end
+ * exactly where the next begins.
  */
 function backgroundRuns(
   grid: Grid,
   fill: string | ((cell: Cell) => string | null),
   step: number,
+  rowStep: number,
   fillBlanks: boolean,
 ): BackgroundRun[] {
   const runs: BackgroundRun[] = [];
-  let current: BackgroundRun | null = null;
+  let current: { run: BackgroundRun; endCol: number } | null = null;
   let lastCol = -1;
+
+  const left = (col: number) => Math.round(col * step);
+  const top = (row: number) => Math.round(row * rowStep);
 
   for (const cell of grid.cells) {
     const skip = !fillBlanks && isBlankGlyph(cell.char);
@@ -278,12 +292,25 @@ function backgroundRuns(
       current = null;
       continue;
     }
-    if (current !== null && current.y === cell.y
-        && current.color === color && cell.col === lastCol + 1) {
-      current.width += step;
+
+    const continues = current !== null
+      && current.run.y === top(cell.row)
+      && current.run.color === color
+      && cell.col === lastCol + 1;
+
+    if (continues) {
+      current!.endCol = cell.col + 1;
+      current!.run.width = left(current!.endCol) - current!.run.x;
     } else {
-      current = { x: cell.x, y: cell.y, width: step, color };
-      runs.push(current);
+      const run: BackgroundRun = {
+        x: left(cell.col),
+        y: top(cell.row),
+        width: left(cell.col + 1) - left(cell.col),
+        height: top(cell.row + 1) - top(cell.row),
+        color,
+      };
+      current = { run, endCol: cell.col + 1 };
+      runs.push(run);
     }
     lastCol = cell.col;
   }
@@ -304,9 +331,10 @@ export function asciiLayer(grid: Grid, options: AsciiLayerOptions): Layer {
     ...layer,
     paintCanvas(ctx) {
       if (cellBackground !== undefined) {
-        for (const run of backgroundRuns(grid, cellBackground, step, fillBlankCells)) {
+        for (const run of backgroundRuns(
+          grid, cellBackground, step, rowStep, fillBlankCells)) {
           ctx.fillStyle = run.color;
-          ctx.fillRect(run.x, run.y, run.width, rowStep);
+          ctx.fillRect(run.x, run.y, run.width, run.height);
         }
       }
 
@@ -350,10 +378,11 @@ export function asciiLayer(grid: Grid, options: AsciiLayerOptions): Layer {
     toSvgMarkup() {
       const parts: string[] = [];
       if (cellBackground !== undefined) {
-        for (const run of backgroundRuns(grid, cellBackground, step, fillBlankCells)) {
+        for (const run of backgroundRuns(
+          grid, cellBackground, step, rowStep, fillBlankCells)) {
           parts.push(
             `<rect x="${run.x}" y="${run.y}" width="${run.width}" ` +
-            `height="${rowStep}" fill="${run.color}"/>`,
+            `height="${run.height}" fill="${run.color}"/>`,
           );
         }
       }
