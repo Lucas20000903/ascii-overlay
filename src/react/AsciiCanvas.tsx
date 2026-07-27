@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
-import type { CSSProperties } from 'react';
+import { useEffect, useImperativeHandle, useRef } from 'react';
+import type { CSSProperties, Ref } from 'react';
 import { drawToCanvas } from '../canvas.js';
 import { useAsciiGrid } from './useAsciiGrid.js';
 import type { Backdrop, DrawOptions, GlyphBlend } from '../canvas.js';
@@ -30,14 +30,21 @@ export interface AsciiCanvasProps extends RenderOptions, GlyphProps {
   fontFamily?: string;
   className?: string;
   style?: CSSProperties;
+  /**
+   * The canvas element itself, for `toDataURL`, `toBlob` or anything else that
+   * needs the backing store.
+   */
+  ref?: Ref<HTMLCanvasElement>;
 }
 
 /** Draw a source image as ASCII art on a canvas. */
 export function AsciiCanvas({
   source, fontSize, background, backdrop, color, blend, pixelRatio, fontFamily,
-  cellBackground, fillBlankCells, offset, className, style, ...options
+  cellBackground, fillBlankCells, offset, className, style, ref: forwarded,
+  ...options
 }: AsciiCanvasProps) {
   const ref = useRef<HTMLCanvasElement>(null);
+  useImperativeHandle(forwarded, () => ref.current!, []);
   const grid = useAsciiGrid(source, options);
   const size = fontSize ?? options.cellHeight;
   const ratio = pixelRatio
