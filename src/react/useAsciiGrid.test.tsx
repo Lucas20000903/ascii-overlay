@@ -82,6 +82,22 @@ describe('useAsciiGrid', () => {
     expect(result.current).toBe(first);
   });
 
+  test('recomputes when a function option changes', () => {
+    // JSON.stringify drops functions, so the structural key cannot see these
+    const source = solid(8, 1, 255);
+    const { result, rerender } = renderHook(
+      ({ dx }: { dx: number }) =>
+        useAsciiGrid(source, {
+          mode: 'characters', cellWidth: 4, cellHeight: 1, ramp: ' @',
+          sampleOffset: () => ({ x: dx, y: 0 }),
+        }),
+      { initialProps: { dx: 0 } },
+    );
+    const first = result.current;
+    rerender({ dx: 4 });
+    expect(result.current).not.toBe(first);
+  });
+
   test('recomputes when an option changes', () => {
     const source = solid(4, 4, 255);
     const { result, rerender } = renderHook(
