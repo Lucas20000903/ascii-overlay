@@ -297,9 +297,9 @@ export function App() {
     return () => document.removeEventListener('paste', onPaste);
   }, []);
 
-  const time = useAnimationTime({
-    playing: playing && (shimmer > 0 || squiggleAmp > 0), speed,
-  });
+  // One clock in real seconds. Shimmer gets its own rate through the render
+  // option, so the speed slider cannot quietly retime the squiggle as well.
+  const time = useAnimationTime({ playing: playing && (shimmer > 0 || squiggleAmp > 0) });
   // squigglevision holds each wobble for a beat instead of changing every frame
   const squiggleFrame = Math.floor(time * squiggleFps);
 
@@ -361,7 +361,7 @@ export function App() {
         : undefined,
     },
     mask,
-    animation: { time, shimmer },
+    animation: { time, shimmer, speed },
   }), [mode, cell.cellWidth, cell.cellHeight, customRamp, rampName, invert, threshold,
        squiggleAmp, squiggleMode, squiggleFrame, contrast, brightness,
        gamma, edgeEmphasis, darkThreshold, coverage, preset, saturation, tintOn,
