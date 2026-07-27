@@ -7,7 +7,7 @@
 window.__bannerReady = (async () => {
   const lib = await import('/dist/index.js');
 
-  const W = 1600, H = 694;
+  const W = 1200, H = 400;
   const load = async (src) => {
     const img = new Image();
     img.src = src;
@@ -33,7 +33,7 @@ window.__bannerReady = (async () => {
   // pixels in as the source would leave most of the shape reading as
   // background. The ink decides where glyphs go; what they read is painted
   // separately, so the rays fill densely and the hole stays a hole.
-  const SUN = 580;
+  const SUN = 470;
 
   const silhouette = pixels((ctx) => {
     ctx.fillStyle = '#fff';
@@ -90,31 +90,34 @@ window.__bannerReady = (async () => {
   };
 
   const title = (ctx) => {
-    const x = 96;
+    const x = 64;
     ctx.textBaseline = 'alphabetic';
     ctx.fillStyle = '#14161a';
-    ctx.font = '700 92px "Helvetica Neue", "Avenir Next", system-ui, sans-serif';
-    ctx.fillText('ascii', x, 292);
+    ctx.font = '700 66px "Helvetica Neue", "Avenir Next", system-ui, sans-serif';
+    ctx.fillText('ascii', x, 186);
     const w = ctx.measureText('ascii').width;
     ctx.fillStyle = '#1a44ff';
-    ctx.fillText('-overlay', x + w, 292);
+    ctx.fillText('-overlay', x + w, 186);
 
     ctx.fillStyle = '#14161a';
-    ctx.font = '400 27px "Helvetica Neue", "Avenir Next", system-ui, sans-serif';
-    ctx.fillText('Glyphs over pictures.', x, 352);
+    ctx.font = '400 21px "Helvetica Neue", "Avenir Next", system-ui, sans-serif';
+    ctx.fillText('Glyphs over pictures.', x, 228);
 
-    ctx.fillStyle = 'rgba(20,22,26,0.72)';
-    ctx.font = '400 19px "Helvetica Neue", "Avenir Next", system-ui, sans-serif';
-    ctx.fillText('Characters, braille and dithered modes. Canvas and SVG.', x, 400);
-    ctx.fillText('Layers, masks, live video. No runtime dependencies.', x, 428);
-
+    ctx.fillStyle = 'rgba(20,22,26,0.7)';
+    ctx.font = '400 15px "Helvetica Neue", "Avenir Next", system-ui, sans-serif';
+    ctx.fillText('Characters, braille and dithered modes. Canvas and SVG.', x, 266);
+    ctx.fillText('Layers, masks, live video. No runtime dependencies.', x, 289);
   };
 
-  const frame = (n, { amp = 1.1 } = {}) => {
+  const frame = (n, { amp = 1.0 } = {}) => {
     const out = document.createElement('canvas');
     out.width = W; out.height = H;
     const ctx = out.getContext('2d');
-    ctx.drawImage(meadow, 0, 0, W, H);
+    // cover-fit rather than stretch: the source is 2.3:1 and the banner is 3:1,
+    // so it gets cropped vertically, biased down to keep the flowers in frame
+    const scale = Math.max(W / meadow.width, H / meadow.height);
+    const dw = meadow.width * scale, dh = meadow.height * scale;
+    ctx.drawImage(meadow, (W - dw) / 2, H - dh + 26, dw, dh);
     title(ctx);
 
     const grid = lib.renderAscii(sunSource, {
@@ -132,7 +135,8 @@ window.__bannerReady = (async () => {
       lib.asciiLayer(grid, { fontSize: FONT, ...cell, color: '#ffffff', opacity: 0.94 }),
     ]);
 
-    ctx.drawImage(art, W - SUN - 110, 26);
+    // deliberately overflowing: a cropped sun reads bigger than a contained one
+    ctx.drawImage(art, W - SUN + 14, -58);
     return out;
   };
 

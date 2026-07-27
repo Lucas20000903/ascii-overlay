@@ -10,3 +10,6 @@ playground/sample.png
 
 # npm pack output
 *.tgz
+
+# extracted from assets/src/sunflower.mp4 by the banner recipe
+assets/src/video/
