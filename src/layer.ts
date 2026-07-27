@@ -302,12 +302,17 @@ export function asciiLayer(grid: Grid, options: AsciiLayerOptions): Layer {
       ctx.textBaseline = 'top';
 
       // One fillText per run rather than per glyph - most of the cost of a
-      // frame. Only safe while cells step exactly one font advance apart:
-      // canvas has no `textLength`, so a mismatch would let a run drift out of
-      // its column.
-      const advance = ctx.measureText('M').width;
-      const batch = cellAdvance(grid) !== null
-        && Math.abs(cellAdvance(grid)! - advance) < 0.05;
+      // frame. Canvas has no `textLength`, so a run only lands in its columns
+      // when every glyph advances by exactly one cell. That needs two things:
+      // the font has to be monospaced, and the cells have to be sized to it.
+      // A proportional font passes the second test on its own, because the
+      // cells were measured from the same face, and would then pack a run of
+      // narrow glyphs into a fraction of the space it should span.
+      const wide = ctx.measureText('M').width;
+      const narrow = ctx.measureText('i').width;
+      const monospaced = Math.abs(wide - narrow) < 0.05;
+      const step2 = cellAdvance(grid);
+      const batch = monospaced && step2 !== null && Math.abs(step2 - wide) < 0.05;
 
       if (batch) {
         for (const run of toRuns(grid, { color })) {
