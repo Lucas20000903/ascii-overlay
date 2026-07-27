@@ -226,6 +226,7 @@ export function App() {
   const [bgColor, setBgColor] = useState('#05070c');
   const [cellBg, setCellBg] = useState<CellBg>('none');
   const [cellBgColor, setCellBgColor] = useState('#101820');
+  const [fillBlanks, setFillBlanks] = useState(true);
   const [underOn, setUnderOn] = useState(false);
   const [underColor, setUnderColor] = useState('#1d3b57');
   const [underOpacity, setUnderOpacity] = useState(0.8);
@@ -341,13 +342,14 @@ export function App() {
       cellBackground: cellBg === 'none' ? undefined
         : cellBg === 'flat' ? cellBgColor
         : c => `rgb(${c.color.r},${c.color.g},${c.color.b})`,
+      fillBlankCells: fillBlanks,
       color: glyphColor || undefined,
       blend: glyphBlend,
       opacity: layerOpacity,
       filter: glow ? 'url(#glow)' : undefined,
     }));
     return stack;
-  }, [transparent, bgColor, cellBg, cellBgColor, backdropImage, backdrop, underOn,
+  }, [transparent, bgColor, cellBg, cellBgColor, fillBlanks, backdropImage, backdrop, underOn,
       underGrid, underCell, underColor, underOpacity, grid, fontSize,
       cell.cellWidth, cell.cellHeight, glyphColor, glyphBlend, layerOpacity, glow]);
 
@@ -548,6 +550,9 @@ export function App() {
         {cellBg === 'flat' && (
           <input type="color" value={cellBgColor}
             onChange={e => setCellBgColor(e.target.value)} />
+        )}
+        {cellBg !== 'none' && (
+          <Check label="fill blank cells" value={fillBlanks} onChange={setFillBlanks} />
         )}
         <Check label="dither under-layer" value={underOn} onChange={setUnderOn} />
         {underOn && (
