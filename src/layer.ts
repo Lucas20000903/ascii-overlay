@@ -1,7 +1,7 @@
 import { toDrawList } from './paint.js';
 import { toRuns } from './runs.js';
 import type { Ctx2D, GlyphBlend } from './canvas.js';
-import type { Grid } from './grid.js';
+import type { Cell, Grid } from './grid.js';
 
 /** Logical drawing area, in source pixels. */
 export interface PaintEnv {
@@ -203,6 +203,15 @@ export interface AsciiLayerOptions extends LayerOptions {
   /** Needed by the svg backend to pin run widths. Read off the grid otherwise. */
   cellWidth?: number;
   cellHeight?: number;
+  /**
+   * Fill behind each cell, painted before its glyph.
+   *
+   * A string paints every cell alike. A function is called per cell, so
+   * `c => \`rgb(${c.color.r},${c.color.g},${c.color.b})\`` turns the art into
+   * colour blocks with the glyphs sitting on top. Blank cells are filled too,
+   * the way a terminal cell has a background even when it holds a space.
+   */
+  cellBackground?: string | ((cell: Cell) => string);
 }
 
 const ESCAPES: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;' };
@@ -216,14 +225,65 @@ function cellAdvance(grid: Grid): number | null {
   return b.x - a.x;
 }
 
+/** Vertical step between rows, read back off the grid. */
+function rowAdvance(grid: Grid): number | null {
+  if (grid.rows < 2) return null;
+  const a = grid.cells[0];
+  const b = grid.cells[grid.cols];
+  return a && b ? b.y - a.y : null;
+}
+
+interface BackgroundRun { x: number; y: number; width: number; color: string }
+
+/**
+ * Merge horizontally adjacent cells that share a background colour.
+ *
+ * One rect per stretch rather than per cell, for the same reason glyphs are
+ * batched into runs. Blanks are included: a cell's background does not depend
+ * on whether it holds a glyph.
+ */
+function backgroundRuns(
+  grid: Grid,
+  fill: string | ((cell: Cell) => string),
+  step: number,
+): BackgroundRun[] {
+  const runs: BackgroundRun[] = [];
+  let current: BackgroundRun | null = null;
+  let lastCol = -1;
+
+  for (const cell of grid.cells) {
+    const color = typeof fill === 'string' ? fill : fill(cell);
+    if (current !== null && current.y === cell.y
+        && current.color === color && cell.col === lastCol + 1) {
+      current.width += step;
+    } else {
+      current = { x: cell.x, y: cell.y, width: step, color };
+      runs.push(current);
+    }
+    lastCol = cell.col;
+  }
+
+  return runs;
+}
+
 /** A glyph grid. */
 export function asciiLayer(grid: Grid, options: AsciiLayerOptions): Layer {
-  const { fontSize, color, fontFamily, cellWidth, cellHeight, ...layer } = options;
+  const {
+    fontSize, color, fontFamily, cellWidth, cellHeight, cellBackground, ...layer
+  } = options;
   const step = cellWidth ?? cellAdvance(grid) ?? fontSize;
+  const rowStep = cellHeight ?? rowAdvance(grid) ?? fontSize;
 
   return {
     ...layer,
     paintCanvas(ctx) {
+      if (cellBackground !== undefined) {
+        for (const run of backgroundRuns(grid, cellBackground, step)) {
+          ctx.fillStyle = run.color;
+          ctx.fillRect(run.x, run.y, run.width, rowStep);
+        }
+      }
+
       ctx.font = `${fontSize}px ${fontFamily ?? 'monospace'}`;
       ctx.textBaseline = 'top';
 
@@ -248,10 +308,19 @@ export function asciiLayer(grid: Grid, options: AsciiLayerOptions): Layer {
       }
     },
     toSvgMarkup() {
-      const parts = [
+      const parts: string[] = [];
+      if (cellBackground !== undefined) {
+        for (const run of backgroundRuns(grid, cellBackground, step)) {
+          parts.push(
+            `<rect x="${run.x}" y="${run.y}" width="${run.width}" ` +
+            `height="${rowStep}" fill="${run.color}"/>`,
+          );
+        }
+      }
+      parts.push(
         `<g font-family="${fontFamily ?? 'monospace'}" font-size="${fontSize}" ` +
         'dominant-baseline="text-before-edge" xml:space="preserve">',
-      ];
+      );
       for (const run of toRuns(grid, { color })) {
         parts.push(
           `<text x="${run.x}" y="${run.y}" fill="${run.color}" ` +
