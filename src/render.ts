@@ -9,7 +9,7 @@ import { gridShape } from './grid.js';
 import { luminance } from './luminance.js';
 import { sampleMask } from './mask.js';
 import { glyphIndex } from './ramp.js';
-import { meanColorCell, meanColorRect } from './sample.js';
+import { meanColorRect } from './sample.js';
 import { applyTone } from './tone.js';
 import type { ShimmerOptions } from './animate.js';
 import type { ColorOptions } from './color.js';
@@ -66,7 +66,21 @@ export interface RenderOptions {
 
   /** Cut-off in 0..1 for braille dots and dither cells. Defaults to 0.5. */
   threshold?: number;
+
+  /**
+   * Displace where each cell reads from, in source pixels.
+   *
+   * The grid stays put; only the window each cell looks through moves, so the
+   * picture appears to shift underneath and the glyphs change to follow. Same
+   * result as warping the source bitmap and far cheaper - no resampling pass,
+   * just different coordinates.
+   *
+   * Reads past the edge clamp to the nearest pixel.
+   */
+  sampleOffset?: (col: number, row: number) => { x: number; y: number };
 }
+
+const NO_OFFSET = { x: 0, y: 0 };
 
 /** Mean colour and shaped luminance for every cell, in row-major order. */
 interface CellPass {
@@ -81,9 +95,13 @@ function cellPass(
   const colors: RGB[] = [];
   let lum = new Float32Array(cols * rows);
 
+  const shift = options.sampleOffset;
   for (let row = 0; row < rows; row++) {
     for (let col = 0; col < cols; col++) {
-      const c = meanColorCell(source, col, row, cellWidth, cellHeight);
+      const d = shift ? shift(col, row) : NO_OFFSET;
+      const x0 = col * cellWidth + d.x;
+      const y0 = row * cellHeight + d.y;
+      const c = meanColorRect(source, x0, y0, x0 + cellWidth, y0 + cellHeight);
       colors.push(c);
       lum[row * cols + col] = luminance(c.r, c.g, c.b);
     }
@@ -192,8 +210,9 @@ function renderBraille(source: Source, options: RenderOptions): Grid {
       let char = BLANK_BRAILLE;
 
       if (!isBlanked(col, row, lum[i]!, options)) {
-        const x0 = col * cellWidth;
-        const y0 = row * cellHeight;
+        const d = options.sampleOffset ? options.sampleOffset(col, row) : NO_OFFSET;
+        const x0 = col * cellWidth + d.x;
+        const y0 = row * cellHeight + d.y;
         const dots: boolean[] = [];
         for (let dy = 0; dy < BRAILLE_ROWS; dy++) {
           for (let dx = 0; dx < BRAILLE_COLS; dx++) {
