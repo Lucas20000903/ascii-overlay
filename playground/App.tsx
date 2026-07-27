@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import {
-  RAMPS, asciiLayer, ellipseMask, fillLayer, gridToText, imageLayer, imageMask,
-  layersToSvg, measureCell, paintLayers, rectMask,
+  RAMPS, asciiLayer, fillLayer, gridToText, imageLayer, layersToSvg,
+  measureCell, paintLayers,
 } from '../dist/index.js';
 import { useAnimationTime, useAsciiGrid, useVideoSource } from '../dist/react/index.js';
 import type { ImageLayerOptions, Layer } from '../dist/index.js';
@@ -132,6 +132,42 @@ const FONTS: readonly string[] = [
 
 type SquiggleMode = 'image' | 'glyph';
 const SQUIGGLE_MODES: readonly SquiggleMode[] = ['image', 'glyph'];
+
+/**
+ * Mask shapes, written here rather than in the library.
+ *
+ * The renderer takes a predicate, so a rectangle, an ellipse and an image matte
+ * are all just functions and none of them needs to be a library concept.
+ */
+type MaskFn = (col: number, row: number) => boolean;
+
+const ellipseMask = (cols: number, rows: number, size: number): MaskFn =>
+  (col, row) => {
+    const dx = (col + 0.5 - cols / 2) / ((cols / 2) * size);
+    const dy = (row + 0.5 - rows / 2) / ((rows / 2) * size);
+    return dx * dx + dy * dy <= 1;
+  };
+
+const rectMask = (cols: number, rows: number, size: number): MaskFn =>
+  (col, row) =>
+    Math.abs(col + 0.5 - cols / 2) <= (cols / 2) * size
+    && Math.abs(row + 0.5 - rows / 2) <= (rows / 2) * size;
+
+/** Sample a matte image at the centre of each cell. */
+function imageMask(
+  matte: Source, cols: number, rows: number,
+  from: 'alpha' | 'luminance', invert: boolean,
+): MaskFn {
+  return (col, row) => {
+    const x = Math.min(matte.width - 1, Math.floor(((col + 0.5) / cols) * matte.width));
+    const y = Math.min(matte.height - 1, Math.floor(((row + 0.5) / rows) * matte.height));
+    const i = (y * matte.width + x) * 4;
+    const v = from === 'alpha'
+      ? matte.data[i + 3]!
+      : 0.2126 * matte.data[i]! + 0.7152 * matte.data[i + 1]! + 0.0722 * matte.data[i + 2]!;
+    return invert ? v < 128 : v >= 128;
+  };
+}
 
 /** Stable-per-frame wobble for one cell. */
 function wobble(col: number, row: number, frame: number, amp: number) {
@@ -308,23 +344,6 @@ export function App() {
   // imageLayer takes any CanvasImageSource, so the backdrop can be the live feed
   const backdropImage = live ? videoRef.current : loaded?.image ?? null;
 
-  const mask = useMemo<Mask | undefined>(() => {
-    if (!source || maskKind === 'none') return undefined;
-    const { width: w, height: h } = source;
-    if (maskKind === 'ellipse') {
-      return ellipseMask(w, h, {
-        cx: w / 2, cy: h / 2, rx: (w / 2) * maskSize, ry: (h / 2) * maskSize,
-      });
-    }
-    if (maskKind === 'rect') {
-      return rectMask(w, h, {
-        x: (w * (1 - maskSize)) / 2, y: (h * (1 - maskSize)) / 2,
-        width: w * maskSize, height: h * maskSize,
-      });
-    }
-    return maskImage ? imageMask(maskImage, { from: maskFrom, invert: maskInvert }) : undefined;
-  }, [source, maskKind, maskSize, maskImage, maskFrom, maskInvert]);
-
   const hex = (v: string) => ({
     r: parseInt(v.slice(1, 3), 16),
     g: parseInt(v.slice(3, 5), 16),
@@ -339,6 +358,16 @@ export function App() {
     fontFamily: activeFont,
   });
   const monospaced = isMonospaced(activeFont, fontSize);
+
+  const mask = useMemo<MaskFn | undefined>(() => {
+    if (!source || maskKind === 'none') return undefined;
+    const cols = Math.ceil(source.width / cell.cellWidth);
+    const rows = Math.ceil(source.height / cell.cellHeight);
+    if (maskKind === 'ellipse') return ellipseMask(cols, rows, maskSize);
+    if (maskKind === 'rect') return rectMask(cols, rows, maskSize);
+    return maskImage ? imageMask(maskImage, cols, rows, maskFrom, maskInvert) : undefined;
+  }, [source, cell.cellWidth, cell.cellHeight, maskKind, maskSize, maskImage,
+      maskFrom, maskInvert]);
 
   const render = useMemo(() => ({
     mode,
