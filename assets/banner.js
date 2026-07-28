@@ -33,7 +33,7 @@ window.__bannerReady = (async () => {
   // pixels in as the source would leave most of the shape reading as
   // background. The ink decides where glyphs go; what they read is painted
   // separately, so the rays fill densely and the hole stays a hole.
-  const SUN = 470;
+  const SUN = 600;
 
   const silhouette = pixels((ctx) => {
     ctx.fillStyle = '#fff';
@@ -136,7 +136,7 @@ window.__bannerReady = (async () => {
     ]);
 
     // deliberately overflowing: a cropped sun reads bigger than a contained one
-    ctx.drawImage(art, W - SUN + 14, -58);
+    ctx.drawImage(art, W - SUN + 52, -104);
     return out;
   };
 

@@ -20,7 +20,7 @@ window.__videoReady = (async () => {
       c.width = W; c.height = H;
       const ctx = c.getContext('2d', { willReadFrequently: true });
       ctx.drawImage(img, 0, 0, W, H);
-      return ctx.getImageData(0, 0, W, H);
+      return { img, pixels: ctx.getImageData(0, 0, W, H) };
     }),
   );
 
@@ -28,21 +28,40 @@ window.__videoReady = (async () => {
   const FONT = 11;
   const cell = lib.measureCell(probe, FONT);
 
+  const SPLIT = W / 2;
+
   const frame = (n) => {
-    const grid = lib.renderAscii(frames[n % COUNT], {
+    const { img, pixels } = frames[n % COUNT];
+
+    const grid = lib.renderAscii(pixels, {
       mode: 'characters',
       ...cell,
       tone: { contrast: 1.35, brightness: 0.04 },
       // the clip is mostly black; without this the empty half fills with dots
       darkThreshold: 0.12,
+      // glyphs on the left, the untouched frame on the right
+      mask: (col) => col * cell.cellWidth < SPLIT,
     });
 
     const out = document.createElement('canvas');
     out.width = W; out.height = H;
-    lib.paintLayers(out.getContext('2d'), [
-      lib.fillLayer('#0b0c0f'),
-      lib.asciiLayer(grid, { fontSize: FONT, ...cell }),
-    ]);
+    const ctx = out.getContext('2d');
+
+    ctx.fillStyle = '#0b0c0f';
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(SPLIT, 0, W - SPLIT, H);
+    ctx.clip();
+    ctx.drawImage(img, 0, 0, W, H);
+    ctx.restore();
+
+    lib.paintLayers(ctx, [lib.asciiLayer(grid, { fontSize: FONT, ...cell })],
+      { clear: false });
+
+    ctx.fillStyle = 'rgba(255,255,255,0.22)';
+    ctx.fillRect(SPLIT, 0, 1, H);
     return out;
   };
 

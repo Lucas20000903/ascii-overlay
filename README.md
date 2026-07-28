@@ -19,12 +19,12 @@ Three modes: character ramps, unicode braille at 2x4 dots per cell, and Floyd-St
 
 <table>
 <tr>
-<td><img src="assets/flowers.webp" alt="a meadow photograph" width="560"></td>
-<td><img src="assets/flowers-ascii.webp" alt="the same meadow as coloured ASCII" width="560"></td>
+<td><img src="assets/flowers.webp" alt="a meadow photograph" width="480"></td>
+<td><img src="assets/flowers-ascii.webp" alt="the same meadow as coloured ASCII" width="480"></td>
 </tr>
 <tr>
 <td align="center"><sub>source</sub></td>
-<td align="center"><sub><code>characters</code>, 13px cells, cell colours kept</sub></td>
+<td align="center"><sub><code>characters</code> at 52px, graded darker and multiplied onto white</sub></td>
 </tr>
 </table>
 
@@ -58,8 +58,10 @@ import { AsciiCanvas } from 'ascii-overlay/react';
 ## Video
 
 <p align="center">
-  <img src="assets/video.webp" alt="a sunflower clip rendered as ASCII" width="720">
+  <img src="assets/video.webp" alt="a sunflower clip, glyphs on the left and the untouched frame on the right" width="720">
 </p>
+
+Left half rendered, right half untouched, split by a `mask` predicate on the column index.
 
 `useVideoSource` samples frames from a `<video>` and hands back a `Source` on every animation frame.
 
