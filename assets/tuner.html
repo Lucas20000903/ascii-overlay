@@ -89,6 +89,19 @@
         <option>standard</option><option>minimal</option>
         <option>detailed</option><option>blocks</option>
       </select></label>
+    <label><span class="row"><span>glyph blend</span></span>
+      <select id="blend">
+        <option>normal</option><option>screen</option><option>overlay</option>
+        <option>color-dodge</option><option>lighter</option>
+      </select></label>
+
+    <h2>Backdrop</h2>
+    <label><span class="row"><span>blur</span><b id="v-blur"></b></span>
+      <input type="range" id="blur" min="0" max="30" step="0.5" value="0"></label>
+    <label><span class="row"><span>opacity</span><b id="v-bop"></b></span>
+      <input type="range" id="bop" min="0" max="1" step="0.01" value="1"></label>
+    <label><span class="row"><span>behind it</span></span>
+      <input type="color" id="base" value="#0b0c0f"></label>
 
     <h2>Tone</h2>
     <label><span class="row"><span>contrast</span><b id="v-contrast"></b></span>
@@ -140,7 +153,7 @@
 
 <script type="module">
 import {
-  measureCell, renderAscii, paintLayers, imageLayer, asciiLayer, RAMPS,
+  measureCell, renderAscii, paintLayers, fillLayer, imageLayer, asciiLayer,
 } from '/dist/index.js';
 
 const img = new Image();
@@ -251,20 +264,30 @@ function draw() {
   };
   const grid = renderAscii(source, { ...render, mask: maskFor(cell) });
 
+  const blur = num('blur');
+  const bop = num('bop');
+  const blend = el('blend').value;
+
   paintLayers(octx, [
-    imageLayer(img),
+    fillLayer(el('base').value),
+    imageLayer(img, {
+      blur: blur > 0 ? blur : undefined,
+      opacity: bop < 1 ? bop : undefined,
+    }),
     asciiLayer(grid, {
       fontSize, ...cell,
       color: el('glyph').value,
       cellBackground: backing,
       fillBlankCells: el('blanks').value === 'true',
+      blend: blend === 'normal' ? undefined : blend,
     }),
   ]);
 
   for (const [id, v] of [['font', fontSize], ['contrast', num('contrast')],
     ['bright', num('bright')], ['sat', num('sat')], ['alpha', alpha],
     ['cut', num('cut')], ['slope', num('slope')],
-    ['lmin', num('lmin')], ['lmax', num('lmax')]]) {
+    ['lmin', num('lmin')], ['lmax', num('lmax')],
+    ['blur', num('blur')], ['bop', num('bop')]]) {
     const b = el('v-' + (id === 'contrast' ? 'contrast' : id));
     if (b) b.textContent = v;
   }
@@ -302,19 +325,24 @@ const grid = renderAscii(source, {
 });
 
 paintLayers(ctx, [
-  imageLayer(photo),
+  fillLayer('${el('base').value}'),
+  imageLayer(photo${blur > 0 || bop < 1
+    ? `, { ${[blur > 0 ? `blur: ${blur}` : null,
+              bop < 1 ? `opacity: ${bop}` : null].filter(Boolean).join(', ')} }`
+    : ''}),
   asciiLayer(grid, {
     fontSize: ${fontSize},
     ...cell,
     color: '${el('glyph').value}',
     cellBackground: ${backing ? `'${backing}'` : 'undefined'},
-    fillBlankCells: ${el('blanks').value},
+    fillBlankCells: ${el('blanks').value},${blend === 'normal' ? '' : `\n    blend: '${blend}',`}
   }),
 ]);`;
 }
 
-for (const id of ['font','glyph','ramp','contrast','bright','sat','backing','alpha',
-                  'blanks','shape','cut','slope','lmin','lmax','linv']) {
+for (const id of ['font','glyph','ramp','blend','contrast','bright','sat','backing',
+                  'alpha','blanks','shape','cut','slope','lmin','lmax','linv',
+                  'blur','bop','base']) {
   el(id).addEventListener('input', draw);
   el(id).addEventListener('change', draw);
 }
