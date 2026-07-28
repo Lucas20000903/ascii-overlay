@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>overlay tuner</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: #0d0f12; color: #d7dde5;
+    font: 13px/1.5 -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  }
+  header { padding: 14px 20px; border-bottom: 1px solid #232a33; }
+  h1 { font-size: 14px; margin: 0; letter-spacing: .02em; }
+  .sub { color: #7d8894; font-size: 12px; margin-top: 3px; }
+  main {
+    display: grid; grid-template-columns: minmax(0, 1fr) 300px;
+    gap: 20px; padding: 16px 20px; height: calc(100vh - 62px);
+  }
+  /* both panes on screen at once, since the point is comparing them */
+  .stage { display: grid; grid-template-rows: 1fr 1fr; gap: 10px; min-width: 0; min-height: 0; }
+  figure { margin: 0; min-height: 0; display: flex; flex-direction: column; }
+  figcaption { color: #7d8894; font-size: 12px; padding: 5px 2px 0; }
+  canvas, img {
+    display: block; min-height: 0; max-width: 100%; max-height: 100%;
+    width: auto; height: auto; object-fit: contain; border-radius: 6px;
+    align-self: start; justify-self: start;
+  }
+  .panel { overflow-y: auto; }
+  .panel { border-left: 1px solid #232a33; padding-left: 18px; overflow-y: auto; }
+  h2 {
+    font-size: 11px; text-transform: uppercase; letter-spacing: .09em;
+    color: #7d8894; margin: 18px 0 8px; padding-bottom: 5px;
+    border-bottom: 1px solid #232a33;
+  }
+  h2:first-of-type { margin-top: 0; }
+  label { display: block; margin-bottom: 10px; }
+  .row { display: flex; justify-content: space-between; align-items: baseline; }
+  .row b { font-weight: 400; color: #8b96a3; font-variant-numeric: tabular-nums; }
+  input[type=range] { width: 100%; margin-top: 3px; }
+  select, input[type=text] {
+    width: 100%; background: #0d0f12; color: #d7dde5;
+    border: 1px solid #2b333d; border-radius: 5px; padding: 5px 7px; font: inherit;
+  }
+  input[type=color] {
+    width: 100%; height: 28px; background: #0d0f12;
+    border: 1px solid #2b333d; border-radius: 5px; padding: 2px;
+  }
+  .actions { display: flex; gap: 8px; margin-top: 14px; }
+  button {
+    background: #222b36; color: #d7dde5; border: 1px solid #333e4b;
+    border-radius: 5px; padding: 7px 12px; font: inherit; cursor: pointer;
+  }
+  button:hover { background: #2c3844; }
+  pre {
+    background: #14181d; border: 1px solid #232a33; border-radius: 6px;
+    padding: 10px; overflow: auto; font-size: 11.5px; margin: 10px 0 0;
+    white-space: pre-wrap; color: #b9c4d0;
+  }
+  .ok { color: #7ddc9a; }
+</style>
+</head>
+<body>
+<header>
+  <h1>overlay tuner</h1>
+  <div class="sub">Original stays on the left. Adjust, then copy the options or save the png.</div>
+</header>
+
+<main>
+  <div class="stage">
+    <figure>
+      <img id="original" alt="original">
+      <figcaption>original</figcaption>
+    </figure>
+    <figure>
+      <canvas id="out"></canvas>
+      <figcaption id="stats">overlay</figcaption>
+    </figure>
+  </div>
+
+  <div class="panel">
+    <h2>Glyphs</h2>
+    <label><span class="row"><span>fontSize</span><b id="v-font"></b></span>
+      <input type="range" id="font" min="8" max="48" step="1" value="24"></label>
+    <label><span class="row"><span>glyph colour</span></span>
+      <input type="color" id="glyph" value="#ffffff"></label>
+    <label><span class="row"><span>ramp</span></span>
+      <select id="ramp">
+        <option>standard</option><option>minimal</option>
+        <option>detailed</option><option>blocks</option>
+      </select></label>
+
+    <h2>Tone</h2>
+    <label><span class="row"><span>contrast</span><b id="v-contrast"></b></span>
+      <input type="range" id="contrast" min="0.4" max="3" step="0.05" value="1.7"></label>
+    <label><span class="row"><span>brightness</span><b id="v-bright"></b></span>
+      <input type="range" id="bright" min="-0.6" max="0.4" step="0.01" value="-0.26"></label>
+    <label><span class="row"><span>saturation</span><b id="v-sat"></b></span>
+      <input type="range" id="sat" min="0" max="3" step="0.05" value="1"></label>
+
+    <h2>Cell backing</h2>
+    <label><span class="row"><span>colour</span></span>
+      <input type="color" id="backing" value="#080a0e"></label>
+    <label><span class="row"><span>alpha</span><b id="v-alpha"></b></span>
+      <input type="range" id="alpha" min="0" max="1" step="0.01" value="0.38"></label>
+    <label><span class="row"><span>fill blank cells</span></span>
+      <select id="blanks"><option value="false">false</option><option value="true">true</option></select></label>
+
+    <h2>Mask</h2>
+    <label><span class="row"><span>shape</span></span>
+      <select id="shape">
+        <option value="diagonal">diagonal</option>
+        <option value="vertical">vertical</option>
+        <option value="ellipse">ellipse</option>
+        <option value="none">none</option>
+      </select></label>
+    <label><span class="row"><span>position</span><b id="v-cut"></b></span>
+      <input type="range" id="cut" min="0.05" max="1" step="0.01" value="0.70"></label>
+    <label><span class="row"><span>slope</span><b id="v-slope"></b></span>
+      <input type="range" id="slope" min="-1.2" max="1.2" step="0.02" value="0.42"></label>
+
+    <h2>Brightness range</h2>
+    <div class="sub" style="margin:-4px 0 6px">Only cells inside the range get a glyph.</div>
+    <canvas id="hist" width="264" height="46"
+            style="width:100%;height:46px;border:1px solid #232a33;border-radius:5px;margin-bottom:8px"></canvas>
+    <label><span class="row"><span>min</span><b id="v-lmin"></b></span>
+      <input type="range" id="lmin" min="0" max="1" step="0.01" value="0"></label>
+    <label><span class="row"><span>max</span><b id="v-lmax"></b></span>
+      <input type="range" id="lmax" min="0" max="1" step="0.01" value="1"></label>
+    <label class="row" style="gap:8px;align-items:center">
+      <input type="checkbox" id="linv" style="margin:0"><span>invert the range</span></label>
+
+    <div class="actions">
+      <button id="copy">Copy options</button>
+      <button id="save">Save png</button>
+    </div>
+    <pre id="code"></pre>
+  </div>
+</main>
+
+<script type="module">
+import {
+  measureCell, renderAscii, paintLayers, imageLayer, asciiLayer, RAMPS,
+} from '/dist/index.js';
+
+const img = new Image();
+img.src = '/assets/flowers.webp';
+await img.decode();
+document.getElementById('original').src = img.src;
+
+const W = img.naturalWidth, H = img.naturalHeight;
+const scratch = document.createElement('canvas');
+scratch.width = W; scratch.height = H;
+const sctx = scratch.getContext('2d', { willReadFrequently: true });
+sctx.drawImage(img, 0, 0);
+const source = sctx.getImageData(0, 0, W, H);
+
+const out = document.getElementById('out');
+out.width = W; out.height = H;
+const octx = out.getContext('2d');
+const probe = document.createElement('canvas').getContext('2d');
+
+const el = (id) => document.getElementById(id);
+const num = (id) => Number(el(id).value);
+const hexToRgba = (hex, a) => {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+};
+
+function shapeFor(cell) {
+  const shape = el('shape').value;
+  const cut = num('cut'), slope = num('slope');
+  if (shape === 'none') return null;
+  if (shape === 'vertical') return (col) => col * cell.cellWidth < W * cut;
+  if (shape === 'ellipse') {
+    return (col, row) => {
+      const dx = (col * cell.cellWidth + cell.cellWidth / 2 - W / 2) / (W / 2 * cut);
+      const dy = (row * cell.cellHeight + cell.cellHeight / 2 - H / 2) / (H / 2 * cut);
+      return dx * dx + dy * dy <= 1;
+    };
+  }
+  return (col, row) => col * cell.cellWidth < W * cut - row * cell.cellHeight * slope;
+}
+
+/** Shape and brightness are both just predicates, so they and together. */
+function maskFor(cell) {
+  const shape = shapeFor(cell);
+  const lo = num('lmin'), hi = num('lmax'), inv = el('linv').checked;
+  const banded = lo > 0 || hi < 1;
+  if (!shape && !banded) return undefined;
+  return (col, row, lum) => {
+    if (shape && !shape(col, row)) return false;
+    if (!banded) return true;
+    const inside = lum >= lo && lum <= hi;
+    return inv ? !inside : inside;
+  };
+}
+
+/**
+ * Where the cells actually sit on the ramp, after tone.
+ *
+ * Without this the range sliders are guesswork: a pale photograph can have
+ * nothing at all below 0.6, and asking for the dark end returns an empty frame
+ * that looks like a bug.
+ */
+function drawHistogram(src, cell, tone) {
+  const bins = new Array(48).fill(0);
+  let total = 0;
+  renderAscii(src, {
+    mode: 'characters', cellWidth: cell.cellWidth, cellHeight: cell.cellHeight, tone,
+    mask: (_c, _r, lum) => {
+      bins[Math.min(bins.length - 1, Math.floor(lum * bins.length))]++;
+      total++;
+      return true;
+    },
+  });
+  const c = el('hist');
+  const ctx = c.getContext('2d');
+  const w = c.width, h = c.height;
+  ctx.clearRect(0, 0, w, h);
+  const peak = Math.max(...bins, 1);
+  const lo = num('lmin'), hi = num('lmax'), inv = el('linv').checked;
+  const bw = w / bins.length;
+  bins.forEach((n, i) => {
+    const t = (i + 0.5) / bins.length;
+    const inside = t >= lo && t <= hi;
+    const on = inv ? !inside : inside;
+    ctx.fillStyle = on ? '#5c9ded' : '#2b333d';
+    const bh = Math.round((n / peak) * (h - 6));
+    ctx.fillRect(i * bw, h - bh, Math.ceil(bw), bh);
+  });
+  ctx.fillStyle = '#7d8894';
+  ctx.font = '9px system-ui, sans-serif';
+  ctx.fillText('0', 2, 9);
+  ctx.fillText('1', w - 8, 9);
+}
+
+function draw() {
+  const fontSize = num('font');
+  const cell = measureCell(probe, fontSize);
+  const alpha = num('alpha');
+  const backing = alpha > 0 ? hexToRgba(el('backing').value, alpha) : undefined;
+
+  const render = {
+    mode: 'characters',
+    cellWidth: +cell.cellWidth.toFixed(2),
+    cellHeight: +cell.cellHeight.toFixed(2),
+    ramp: el('ramp').value,
+    tone: { contrast: num('contrast'), brightness: num('bright') },
+    grade: { saturation: num('sat') },
+  };
+  const grid = renderAscii(source, { ...render, mask: maskFor(cell) });
+
+  paintLayers(octx, [
+    imageLayer(img),
+    asciiLayer(grid, {
+      fontSize, ...cell,
+      color: el('glyph').value,
+      cellBackground: backing,
+      fillBlankCells: el('blanks').value === 'true',
+    }),
+  ]);
+
+  for (const [id, v] of [['font', fontSize], ['contrast', num('contrast')],
+    ['bright', num('bright')], ['sat', num('sat')], ['alpha', alpha],
+    ['cut', num('cut')], ['slope', num('slope')],
+    ['lmin', num('lmin')], ['lmax', num('lmax')]]) {
+    const b = el('v-' + (id === 'contrast' ? 'contrast' : id));
+    if (b) b.textContent = v;
+  }
+  drawHistogram(source, cell, { contrast: num('contrast'), brightness: num('bright') });
+
+  el('stats').textContent =
+    `overlay - ${grid.cols}x${grid.rows} cells, ${cell.cellWidth.toFixed(2)}x${cell.cellHeight.toFixed(2)}px`;
+
+  const shape = el('shape').value;
+  const lo = num('lmin'), hi = num('lmax'), inv = el('linv').checked;
+  const parts = [];
+  if (shape === 'vertical') parts.push(`col * cellWidth < ${W} * ${num('cut')}`);
+  else if (shape === 'ellipse') parts.push(`insideEllipse(col, row, ${num('cut')})`);
+  else if (shape === 'diagonal') {
+    parts.push(`col * cellWidth < ${W} * ${num('cut')} - row * cellHeight * ${num('slope')}`);
+  }
+  if (lo > 0 || hi < 1) {
+    const band = `lum >= ${lo} && lum <= ${hi}`;
+    parts.push(inv ? `!(${band})` : band);
+  }
+  const maskSrc = parts.length === 0
+    ? 'undefined'
+    : `(col, row, lum) =>\n    ${parts.join('\n    && ')}`;
+
+  el('code').textContent =
+`const cell = measureCell(ctx, ${fontSize});
+
+const grid = renderAscii(source, {
+  mode: 'characters',
+  ...cell,
+  ramp: '${render.ramp}',
+  tone: { contrast: ${render.tone.contrast}, brightness: ${render.tone.brightness} },
+  grade: { saturation: ${render.grade.saturation} },
+  mask: ${maskSrc},
+});
+
+paintLayers(ctx, [
+  imageLayer(photo),
+  asciiLayer(grid, {
+    fontSize: ${fontSize},
+    ...cell,
+    color: '${el('glyph').value}',
+    cellBackground: ${backing ? `'${backing}'` : 'undefined'},
+    fillBlankCells: ${el('blanks').value},
+  }),
+]);`;
+}
+
+for (const id of ['font','glyph','ramp','contrast','bright','sat','backing','alpha',
+                  'blanks','shape','cut','slope','lmin','lmax','linv']) {
+  el(id).addEventListener('input', draw);
+  el(id).addEventListener('change', draw);
+}
+
+el('copy').addEventListener('click', async () => {
+  await navigator.clipboard.writeText(el('code').textContent);
+  const b = el('copy');
+  b.textContent = 'Copied';
+  b.classList.add('ok');
+  setTimeout(() => { b.textContent = 'Copy options'; b.classList.remove('ok'); }, 1200);
+});
+
+el('save').addEventListener('click', () => {
+  const a = document.createElement('a');
+  a.href = out.toDataURL('image/png');
+  a.download = 'overlay.png';
+  a.click();
+});
+
+draw();
+</script>
+</body>
+</html>

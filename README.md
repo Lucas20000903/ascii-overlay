@@ -176,12 +176,22 @@ Reduces a `Source` to a `Grid` of cells, each with a glyph, a mean colour and a 
 | `darkThreshold` | 0..1, cells dimmer than this go blank |
 | `coverage`, `coverageSeed` | 0..1 fraction of cells to keep, thinned by hash |
 | `grade` | `{ preset, saturation, tint }` applied to cell colour |
-| `mask` | `(col, row) => boolean`, false leaves the cell blank |
+| `mask` | `(col, row, luminance) => boolean`, false leaves the cell blank |
 | `animation` | `{ time, shimmer, speed, seed }`, wobbles the glyph index |
 | `threshold` | 0..1 cut-off for braille dots and dither cells |
 | `sampleOffset` | `(col, row) => { x, y }`, moves where the cell reads |
 
 Grade presets: `none`, `bw`, `sepia`, `warm`, `cool`, `vintage`, `fade`, `cyber`. Ramps: `minimal`, `standard`, `detailed`, `blocks`.
+
+`mask` gets the cell's luminance after `tone` and `edgeEmphasis`, so brightness is a selection criterion and not only position. `darkThreshold` keeps the bright end; a predicate keeps either end, or a band, or a shape and a band together.
+
+```ts
+mask: (col, row, lum) => lum < 0.9                       // skip the brightest cells
+mask: (col, row, lum) => lum > 0.55 && lum < 0.85        // a band
+mask: (col, row, lum) => col < 40 && lum > 0.6           // and a shape
+```
+
+Check the distribution before picking numbers. A pale photograph can have nothing below 0.6 at all, and asking for the dark end then returns an empty frame that looks like a bug. `assets/tuner.html` plots it.
 
 ### asciiLayer(grid, options)
 
@@ -234,7 +244,7 @@ Cell backgrounds round to whole pixels by default. Cells step a fractional dista
 ```bash
 npm run sample       # generate the demo image, no dependencies
 npm run build        # dist/
-npm test             # 310 tests
+npm test             # 317 tests
 npm run typecheck
 ```
 

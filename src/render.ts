@@ -61,8 +61,13 @@ export interface RenderOptions {
    * A predicate rather than a shape: rectangles, ellipses, freehand paths and
    * image mattes are all just functions, and the renderer has no reason to know
    * which one you meant.
+   *
+   * The third argument is the cell's luminance in 0..1, after `tone` and
+   * `edgeEmphasis` have shaped it, which makes brightness a selection criterion
+   * as well as position. `darkThreshold` keeps the bright end; a predicate can
+   * keep either end, or a band, or both together with a shape.
    */
-  mask?: (col: number, row: number) => boolean;
+  mask?: (col: number, row: number, luminance: number) => boolean;
 
   // --- Animation ---
   animation?: ShimmerOptions;
@@ -143,7 +148,7 @@ function isBlanked(
   if (options.coverage !== undefined &&
       !shouldDraw(col, row, options.coverage, options.coverageSeed ?? 0)) return true;
 
-  if (options.mask && !options.mask(col, row)) return true;
+  if (options.mask && !options.mask(col, row, lum)) return true;
 
   return false;
 }
