@@ -17,16 +17,13 @@ Most ASCII converters stop at the text. This one keeps going: `renderAscii` redu
 
 Three modes: character ramps, unicode braille at 2x4 dots per cell, and Floyd-Steinberg dither. Two backends: canvas for speed, SVG for glyphs that stay sharp at any zoom. The same `Grid` feeds both.
 
-<table>
-<tr>
-<td><img src="assets/flowers.webp" alt="a meadow photograph" width="480"></td>
-<td><img src="assets/flowers-ascii.webp" alt="the same meadow as coloured ASCII" width="480"></td>
-</tr>
-<tr>
-<td align="center"><sub>source</sub></td>
-<td align="center"><sub><code>characters</code> at 52px, graded darker and multiplied onto white</sub></td>
-</tr>
-</table>
+<p align="center">
+  <img src="assets/overlay.webp" alt="a meadow photograph with part of it rendered as glyphs" width="1000">
+</p>
+
+<p align="center">
+  <sub>the photograph is the backdrop, glyphs cover one region, and a <code>mask</code> predicate draws the edge</sub>
+</p>
 
 The banner above was made with the library. The sun's silhouette is a mask predicate and the wobble comes from `sampleOffset`; the source is in [`assets/banner.js`](assets/banner.js).
 
