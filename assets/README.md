@@ -3,8 +3,8 @@
 `banner.webp` and `video.webp` are rendered by the library, so they can be rebuilt.
 
 ```bash
-npm run build                  # the scripts import dist/
-python3 -m http.server 8901    # serve the project root
+npm run build      # the scripts import dist/
+npm run serve      # serves the project root with no-store
 ```
 
 Open `http://127.0.0.1:8901/demo/`, then in the console:

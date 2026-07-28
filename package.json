@@ -52,7 +52,8 @@
     "typecheck": "tsc --noEmit",
     "sample": "node scripts/make-sample.mjs",
     "playground": "vite playground",
-    "prepublishOnly": "npm run typecheck && npm test && npm run build"
+    "prepublishOnly": "npm run typecheck && npm test && npm run build",
+    "serve": "node scripts/serve.mjs"
   },
   "peerDependencies": {
     "react": ">=18"

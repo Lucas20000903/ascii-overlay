@@ -251,9 +251,11 @@ npm run typecheck
 `playground/` is a React app with a control for every option, plus clipboard paste, webcam and video input. `demo/` renders every option into one contact sheet.
 
 ```bash
-npx vite playground              # http://127.0.0.1:5180
-python3 -m http.server 8901      # http://127.0.0.1:8901/demo/
+npx vite playground     # http://127.0.0.1:5180
+npm run serve           # http://127.0.0.1:8901/demo/ and /assets/tuner.html
 ```
+
+Use `npm run serve` rather than a plain static server. The pages import `dist/index.js`, whose own imports carry no cache buster, so a browser will happily keep running a build from an hour ago; this one sends `no-store`.
 
 Squigglevision and the mask shapes live in `playground/App.tsx`, not in the library. They are a dozen lines each against the seams above.
 
