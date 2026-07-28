@@ -22,7 +22,7 @@ Three modes: character ramps, unicode braille at 2x4 dots per cell, and Floyd-St
 </p>
 
 <p align="center">
-  <sub>the photograph is the backdrop, glyphs cover one region, and a <code>mask</code> predicate draws the edge</sub>
+  <sub>the photograph is the backdrop, glyphs land only on cells darker than 0.76, each in its own colour</sub>
 </p>
 
 The banner above was made with the library. The sun's silhouette is a mask predicate and the wobble comes from `sampleOffset`; the source is in [`assets/banner.js`](assets/banner.js).

@@ -82,7 +82,10 @@
     <h2>Glyphs</h2>
     <label><span class="row"><span>fontSize</span><b id="v-font"></b></span>
       <input type="range" id="font" min="8" max="48" step="1" value="24"></label>
-    <label><span class="row"><span>glyph colour</span></span>
+    <label class="row" style="gap:8px;align-items:center;margin-bottom:8px">
+      <input type="checkbox" id="cellcol" style="margin:0" checked>
+      <span>use each cell's own colour</span></label>
+    <label id="glyph-wrap"><span class="row"><span>flat glyph colour</span></span>
       <input type="color" id="glyph" value="#ffffff"></label>
     <label><span class="row"><span>ramp</span></span>
       <select id="ramp">
@@ -264,6 +267,11 @@ function draw() {
   };
   const grid = renderAscii(source, { ...render, mask: maskFor(cell) });
 
+  // no colour at all means every glyph keeps the mean colour of its own cell
+  const useCell = el('cellcol').checked;
+  const glyphColour = useCell ? undefined : el('glyph').value;
+  el('glyph-wrap').style.display = useCell ? 'none' : 'block';
+
   const blur = num('blur');
   const bop = num('bop');
   const blend = el('blend').value;
@@ -276,7 +284,7 @@ function draw() {
     }),
     asciiLayer(grid, {
       fontSize, ...cell,
-      color: el('glyph').value,
+      color: glyphColour,
       cellBackground: backing,
       fillBlankCells: el('blanks').value === 'true',
       blend: blend === 'normal' ? undefined : blend,
@@ -333,14 +341,15 @@ paintLayers(ctx, [
   asciiLayer(grid, {
     fontSize: ${fontSize},
     ...cell,
-    color: '${el('glyph').value}',
+    ${useCell ? '// no color: each glyph keeps its cell colour'
+              : `color: '${el('glyph').value}',`}
     cellBackground: ${backing ? `'${backing}'` : 'undefined'},
     fillBlankCells: ${el('blanks').value},${blend === 'normal' ? '' : `\n    blend: '${blend}',`}
   }),
 ]);`;
 }
 
-for (const id of ['font','glyph','ramp','blend','contrast','bright','sat','backing',
+for (const id of ['font','glyph','cellcol','ramp','blend','contrast','bright','sat','backing',
                   'alpha','blanks','shape','cut','slope','lmin','lmax','linv',
                   'blur','bop','base']) {
   el(id).addEventListener('input', draw);

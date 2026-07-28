@@ -38,3 +38,35 @@ The sun is worth a note. Its silhouette is used as a `mask` predicate, but the b
 glyphs read is painted from that silhouette rather than taken from the asset. The asset's ink
 covers about a seventh of the frame, since the disc is hollow and the rays leave wide gaps, so
 feeding those pixels in as the source leaves most of the shape reading as background.
+
+## The readme overlay
+
+`overlay.webp` comes out of `tuner.html`. The settings behind the committed one:
+
+```ts
+const cell = measureCell(ctx, 23);
+
+const grid = renderAscii(source, {
+  mode: 'characters',
+  ...cell,
+  ramp: 'standard',
+  tone: { contrast: 1.5, brightness: -0.28 },
+  grade: { saturation: 1.5 },
+  mask: (col, row, lum) => !(lum >= 0.76 && lum <= 1),
+});
+
+paintLayers(ctx, [
+  fillLayer('#0b0c0f'),
+  imageLayer(photo, { blur: 2 }),
+  asciiLayer(grid, {
+    fontSize: 23,
+    ...cell,
+    fillBlankCells: false,
+    blend: 'overlay',
+  }),
+]);
+```
+
+The mask keeps the darker 30% of cells, which on this photograph means the
+flowers and the patch of blue sky, and leaves the pale middle alone. Glyphs take
+their cell colours, so the flowers colour their own type.
